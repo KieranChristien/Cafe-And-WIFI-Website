@@ -6,9 +6,67 @@ from web.models import Cafe, CafeAttribute
 main = Blueprint('main', __name__)
 
 
-@main.route('/', methods=['GET', 'POST'])
+def _get_filtered_cafes():
+    stmt = db.select(Cafe)
+
+    amenities = request.args.getlist('amenities')
+    payments = request.args.getlist('payments')
+    features = request.args.getlist('features')
+
+    # Every selected amenity must match
+    for slug in amenities:
+        stmt = stmt.where(
+            Cafe.attributes.any(
+                db.and_(
+                    CafeAttribute.category == 'amenity',
+                    CafeAttribute.slug == slug
+                )
+            )
+        )
+
+    # Every selected payment method must match
+    for slug in payments:
+        stmt = stmt.where(
+            Cafe.attributes.any(
+                db.and_(
+                    CafeAttribute.category == 'payment',
+                    CafeAttribute.slug == slug
+                )
+            )
+        )
+
+    # Every selected feature must match
+    for slug in features:
+        stmt = stmt.where(
+            Cafe.attributes.any(
+                db.and_(
+                    CafeAttribute.category == 'feature',
+                    CafeAttribute.slug == slug
+                )
+            )
+        )
+
+    return stmt
+
+def _pagination_url(page):
+    args = request.args.to_dict(flat=False)
+    args['page'] = page
+    return url_for('main.home', **args)
+
+@main.route('/')
 def home():
-    cafes = db.session.execute(db.select(Cafe)).scalars().all()
+    page = request.args.get('page', 1, type=int)
+    per_page = 6
+
+    stmt = db.select(Cafe).order_by(Cafe.id.asc())
+
+    pagination = db.paginate(
+        stmt,
+        page=page,
+        per_page=per_page,
+        error_out=False
+    )
+
     cafe_amenities = db.session.execute(
         db.select(CafeAttribute).where(CafeAttribute.category == "amenity")
     ).scalars().all()
@@ -31,7 +89,9 @@ def home():
 
     return render_template(
         "index.html",
-        cafes=cafes,
+        cafes=pagination.items,
+        pagination=pagination,
+        pagination_url=_pagination_url,
         cafe_amenities=cafe_amenities,
         cafe_features=cafe_features,
         cafe_payments=cafe_payments,
