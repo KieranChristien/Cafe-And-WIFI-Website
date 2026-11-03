@@ -7,6 +7,12 @@ main = Blueprint('main', __name__)
 
 
 @main.route('/', methods=['GET', 'POST'])
+def _pagination_url(page):
+    args = request.args.to_dict(flat=False)
+    args['page'] = page
+    return url_for('main.home', **args)
+
+@main.route('/')
 def home():
     cafes = db.session.execute(db.select(Cafe)).scalars().all()
     cafe_amenities = db.session.execute(
@@ -31,7 +37,9 @@ def home():
 
     return render_template(
         "index.html",
-        cafes=cafes,
+        cafes=pagination.items,
+        pagination=pagination,
+        pagination_url=_pagination_url,
         cafe_amenities=cafe_amenities,
         cafe_features=cafe_features,
         cafe_payments=cafe_payments,

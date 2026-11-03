@@ -33,7 +33,20 @@
             <div class="lg:col-8" id="results">
 
                 <div class="d-flex flex-wrap align-items-center gap-3 mb-5">
-                    <p class="fs-sm fg-2 mb-0 me-auto"><strong class="fg-1">86</strong> places in Ghent</p>
+                    <p class="fs-sm fg-2 mb-0 me-auto">
+                        <strong class="fg-1">
+                            {{ pagination.total }}
+                        </strong> places in London
+
+                        {% if pagination.total > 0 %}
+                        <span class="fg-3">
+                        · Showing
+                        {{ (pagination.page - 1) * pagination.per_page + 1 }}
+                        –
+                        {{ (pagination.page - 1) * pagination.per_page + pagination.items|length }}
+                        </span>
+                        {% endif %}
+                    </p>
 
                     <button class="btn-outline theme-secondary btn-sm" type="button" data-bs-toggle="drawer"
                             data-bs-target="#filterDrawer">
@@ -119,11 +132,60 @@
 
                 <nav aria-label="Results pages" class="mt-7">
                     <ul class="pagination mb-0">
-                        <li class="page-item"><a class="page-link" href="#results">Previous</a></li>
-                        <li class="page-item"><a class="page-link active" aria-current="page" href="#results">1</a></li>
-                        <li class="page-item"><a class="page-link" href="#results">2</a></li>
-                        <li class="page-item"><a class="page-link" href="#results">3</a></li>
-                        <li class="page-item"><a class="page-link" href="#results">Next</a></li>
+                        <!-- Previous -->
+                        <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
+                            {% if pagination.has_prev %}
+                            <a class="page-link"
+                               href="{{ pagination_url(pagination.prev_num) }}"
+                               rel="prev">
+                                Previous
+                            </a>
+                            {% else %}
+                            <span class="page-link">Previous</span>
+                            {% endif %}
+                        </li>
+                        <!-- Page numbers -->
+                        {% for page_num in pagination.iter_pages(
+                        left_edge=1,
+                        right_edge=1,
+                        left_current=1,
+                        right_current=2
+                        ) %}
+
+                        {% if page_num %}
+
+                        <li class="page-item {% if page_num == pagination.page %}active{% endif %}">
+                            <a class="page-link"
+                               href="{{ pagination_url(page_num) }}"
+                               {% if page_num== pagination.page %}
+                               aria-current="page"
+                               {% endif %}>
+                                {{ page_num }}
+                            </a>
+                        </li>
+
+                        {% else %}
+
+                        <li class="page-item disabled">
+                            <span class="page-link">…</span>
+                        </li>
+
+                        {% endif %}
+
+                        {% endfor %}
+
+                        <!-- Next -->
+                        <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
+                            {% if pagination.has_next %}
+                            <a class="page-link"
+                               href="{{ pagination_url(pagination.next_num) }}"
+                               rel="next">
+                                Next
+                            </a>
+                            {% else %}
+                            <span class="page-link">Next</span>
+                            {% endif %}
+                        </li>
                     </ul>
                 </nav>
             </div>
