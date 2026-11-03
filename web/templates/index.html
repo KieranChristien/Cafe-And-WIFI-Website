@@ -278,6 +278,7 @@
         <h5 class="drawer-title" id="filterDrawerLabel">Filters</h5>
         <button type="button" class="btn-close" data-bs-dismiss="drawer" aria-label="Close"></button>
     </div>
+
     <div class="drawer-body">
 
         <div class="filter-drawer-group">
@@ -300,9 +301,9 @@
 
         <div class="filter-drawer-group">
             <h3 class="fs-sm fw-semibold mb-4">Features</h3>
-            <div class="chip-input" data-bs-chips>
+            <div class="chip-input" id="featurePicker" data-bs-chips>
                 <label class="chip-input-label visually-hidden" for="featureInput">Features</label>
-                <input type="text" class="form-ghost" id="featureInput" placeholder="Add…">
+                <input type="text" class="form-ghost" id="featureInput" placeholder="Add…" autocomplete="off">
             </div>
         </div>
 
@@ -356,25 +357,28 @@
 
         <div class="filter-drawer-group">
             <h3 class="fs-sm fw-semibold mb-4">Amenities</h3>
+
             {% for amenity in cafe_amenities %}
             <div class="form-field mb-3">
-                <input type="checkbox" class="check" id="f{{ amenity.name }}">
-                <label for="f{{ amenity.name }}">{{ amenity.name }}</label>
+                <input type="checkbox" class="check" id="amenity-{{ amenity.slug }}" name="amenities" value="{{ amenity.slug }}">
+                <label for="amenity-{{ amenity.slug }}">{{ amenity.name }}</label>
             </div>
             {% endfor %}
         </div>
 
         <div class="filter-drawer-group">
             <h3 class="fs-sm fw-semibold mb-4">Payment</h3>
+
             {% for payment in cafe_payments %}
             <div class="form-field mb-3">
-                <input type="checkbox" class="check" id="f{{ payment.name }}">
-                <label for="f{{ payment.name }}">{{ payment.name }}</label>
+                <input type="checkbox" class="check" id="payment-{{ payment.slug }}" name="payments" value="{{ payment.slug }}">
+                <label for="payment-{{ payment.slug }}">{{ payment.name }}</label>
             </div>
             {% endfor %}
         </div>
 
-        <button class="btn-solid theme-primary w-100 mt-6" type="button" data-bs-dismiss="drawer">Show 86 places
+        <button class="btn-solid theme-primary w-100 mt-6" type="button" data-bs-dismiss="drawer">
+            Show 86 places
         </button>
     </div>
 </dialog>
