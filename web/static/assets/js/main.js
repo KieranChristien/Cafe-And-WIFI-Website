@@ -2,7 +2,7 @@
  * Locale — Bootstrap 6 directory template
  */
 
-import {Datepicker} from 'bootstrap'
+import {Chips, Datepicker} from 'bootstrap'
 import {initBase, onReady} from './base.js'
 
 // Fix Bootstrap's datepicker inside native <dialog> elements.
@@ -356,6 +356,361 @@ const copyToClipboard = async (text) => {
     }
 }
 
+const initFeaturePicker = () => {
+    const picker = document.getElementById('featurePicker')
+    if (!picker) return
+
+    const container = picker.querySelector('[data-bs-chips]')
+    const input = picker.querySelector('#featureInput')
+    const suggestions = picker.querySelector('#featureSuggestions')
+    const hiddenFields = picker.querySelector('[data-chip-values]')
+    const status = picker.querySelector('#featureInputStatus')
+
+    const options = JSON.parse(
+        container.dataset.featureOptions || '[]'
+    )
+
+    const normalise = (value) => String(value)
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .trim()
+
+    const optionsByName = new Map(
+        options.map(option => [
+            normalise(option.name),
+            option
+        ])
+    )
+
+    const findOption = value =>
+        optionsByName.get(normalise(value))
+
+    const chips = Chips.getOrCreateInstance(container)
+
+    let matches = []
+    let activeIndex = -1
+
+    // Create one hidden form field for every selected feature.
+    const syncHiddenFields = () => {
+        hiddenFields.replaceChildren()
+
+        for (const value of chips.getValues()) {
+            const option = findOption(value)
+            if (!option) continue
+
+            const hidden = document.createElement('input')
+
+            hidden.type = 'text'
+            hidden.className = 'chip'
+            hidden.name = 'features'
+            hidden.value = option.slug
+            hidden.readOnly = true
+            hidden.hidden = true
+
+            hiddenFields.append(hidden)
+        }
+    }
+
+    // Never allow a chip that does not exist in the feature list.
+    container.addEventListener('add.bs.chips', event => {
+        const option = findOption(event.detail.value)
+
+        const alreadySelected = option &&
+            chips.getValues().some(
+                value => normalise(value) === normalise(option.name)
+            )
+
+        if (!option || alreadySelected) {
+            event.preventDefault()
+        }
+    })
+
+    container.addEventListener(
+        'change.bs.chips',
+        syncHiddenFields
+    )
+
+    // Levenshtein distance for typo-tolerant matching.
+    const editDistance = (a, b) => {
+        let previous = Array.from(
+            {length: b.length + 1},
+            (_, i) => i
+        )
+
+        for (let i = 1; i <= a.length; i++) {
+            const current = [i]
+
+            for (let j = 1; j <= b.length; j++) {
+                current[j] = Math.min(
+                    current[j - 1] + 1,
+                    previous[j] + 1,
+                    previous[j - 1] +
+                    (a[i - 1] === b[j - 1] ? 0 : 1)
+                )
+            }
+
+            previous = current
+        }
+
+        return previous[b.length]
+    }
+
+    // Lower scores represent better matches.
+    const scoreMatch = (name, query) => {
+        const words = name.split(/\s+/)
+
+        if (name === query) return 0
+
+        if (name.startsWith(query)) {
+            return 10 + (name.length - query.length) / 100
+        }
+
+        if (words.some(word => word.startsWith(query))) {
+            return 20
+        }
+
+        if (name.includes(query)) {
+            return 30 + name.indexOf(query) / 100
+        }
+
+        const distance = Math.min(
+            editDistance(query, name),
+            ...words.map(word => editDistance(query, word))
+        )
+
+        const threshold = Math.max(
+            1,
+            Math.floor(query.length * 0.35)
+        )
+
+        return distance <= threshold &&
+        distance / query.length <= 0.4
+            ? 40 + distance
+            : Infinity
+    }
+
+    const hideSuggestions = () => {
+        suggestions.hidden = true
+        suggestions.replaceChildren()
+
+        input.setAttribute('aria-expanded', 'false')
+        input.removeAttribute('aria-activedescendant')
+
+        matches = []
+        activeIndex = -1
+    }
+
+    const updateActiveSuggestion = () => {
+        const buttons = suggestions.querySelectorAll(
+            '[role="option"]'
+        )
+
+        buttons.forEach((button, index) => {
+            const active = index === activeIndex
+
+            button.classList.toggle('is-active', active)
+            button.setAttribute('aria-selected', String(active))
+        })
+
+        if (activeIndex >= 0) {
+            input.setAttribute(
+                'aria-activedescendant',
+                `featureSuggestion-${activeIndex}`
+            )
+
+            buttons[activeIndex]?.scrollIntoView({
+                block: 'nearest'
+            })
+        } else {
+            input.removeAttribute('aria-activedescendant')
+        }
+    }
+
+    // Only accept an actual option from the server-provided list.
+    const selectFeature = option => {
+        const alreadySelected = chips.getValues().some(
+            value => normalise(value) === normalise(option.name)
+        )
+
+        if (alreadySelected) {
+            input.value = ''
+            hideSuggestions()
+            input.focus()
+            return
+        }
+
+        const chip = chips.add(option.name)
+
+        if (!chip) return
+
+        input.value = ''
+        hideSuggestions()
+        input.focus()
+
+        if (status) {
+            status.textContent = `${option.name} added.`
+        }
+    }
+
+    const renderSuggestions = () => {
+        const query = normalise(input.value)
+
+        const selectedSlugs = new Set(
+            chips.getValues()
+                .map(value => findOption(value)?.slug)
+                .filter(Boolean)
+        )
+
+        if (!query) {
+            // No search term: show every feature that hasn't been selected.
+            matches = options.filter(
+                option => !selectedSlugs.has(option.slug)
+            )
+        } else {
+            // Search term entered: show the six closest matches.
+            matches = options
+                .map((option, index) => ({
+                    option,
+                    index,
+                    score: scoreMatch(
+                        normalise(option.name),
+                        query
+                    )
+                }))
+                .filter(item =>
+                    Number.isFinite(item.score) &&
+                    !selectedSlugs.has(item.option.slug)
+                )
+                .sort((a, b) =>
+                    a.score - b.score || a.index - b.index
+                )
+                .slice(0, 6)
+                .map(item => item.option)
+        }
+
+        activeIndex = -1
+        suggestions.replaceChildren()
+
+        if (!matches.length) {
+            const empty = document.createElement('div')
+            empty.className = 'chip-suggestions-empty'
+            empty.textContent = 'No matching features.'
+
+            suggestions.append(empty)
+        } else {
+            matches.forEach((option, index) => {
+                const button = document.createElement('button')
+
+                button.type = 'button'
+                button.className = 'chip-suggestion'
+                button.id = `featureSuggestion-${index}`
+                button.setAttribute('role', 'option')
+                button.setAttribute('aria-selected', 'false')
+                button.textContent = option.name
+
+                button.addEventListener('mousedown', event => {
+                    event.preventDefault()
+                })
+
+                button.addEventListener('mouseenter', () => {
+                    activeIndex = index
+                    updateActiveSuggestion()
+                })
+
+                button.addEventListener('click', () => {
+                    selectFeature(option)
+                })
+
+                suggestions.append(button)
+            })
+        }
+
+        suggestions.hidden = false
+        input.setAttribute('aria-expanded', 'true')
+
+        if (status) {
+            status.textContent = matches.length
+                ? `${matches.length} available features.`
+                : 'No matching features.'
+        }
+    }
+
+    input.addEventListener('input', renderSuggestions)
+    input.addEventListener('focus', renderSuggestions)
+
+    input.addEventListener('blur', event => {
+        if (!suggestions.contains(event.relatedTarget)) {
+            hideSuggestions()
+        }
+    })
+
+    // Prevent Bootstrap's paste handler from creating free-form chips.
+    input.addEventListener('paste', event => {
+        event.stopImmediatePropagation()
+    }, true)
+
+    // Keyboard interaction.
+    input.addEventListener('keydown', event => {
+        if (event.key === 'Enter') {
+            event.preventDefault()
+            event.stopImmediatePropagation()
+
+            const option = matches[activeIndex] || matches[0]
+
+            if (option) {
+                selectFeature(option)
+            } else if (status) {
+                status.textContent =
+                    'Choose an existing feature from the suggestions.'
+            }
+
+            return
+        }
+
+        if (
+            !suggestions.hidden &&
+            matches.length &&
+            event.key === 'ArrowDown'
+        ) {
+            event.preventDefault()
+            event.stopImmediatePropagation()
+
+            activeIndex = activeIndex < matches.length - 1
+                ? activeIndex + 1
+                : 0
+
+            updateActiveSuggestion()
+            return
+        }
+
+        if (
+            !suggestions.hidden &&
+            matches.length &&
+            event.key === 'ArrowUp'
+        ) {
+            event.preventDefault()
+            event.stopImmediatePropagation()
+
+            activeIndex = activeIndex > 0
+                ? activeIndex - 1
+                : matches.length - 1
+
+            updateActiveSuggestion()
+            return
+        }
+
+        if (event.key === 'Escape' && !suggestions.hidden) {
+            event.preventDefault()
+            event.stopImmediatePropagation()
+            hideSuggestions()
+        }
+    }, true)
+
+    // Synchronise any chips initially rendered from the query string.
+    syncHiddenFields()
+}
+
 const initShareButton = () => {
     const button = document.querySelector('[data-share-url]')
     const status = document.getElementById('shareStatus')
@@ -383,6 +738,8 @@ const initShareButton = () => {
 
 onReady(() => {
     initBase()
+    initFeaturePicker()
+
     bindRange('ratingRange', 'ratingOut', (v) => Number(v).toFixed(1))
     initMapSync()
     initOpenDatepicker()

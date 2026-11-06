@@ -395,10 +395,47 @@
 
             <div class="filter-drawer-group">
                 <h3 class="fs-sm fw-semibold mb-4">Features</h3>
-                <div class="chip-input" id="featurePicker" data-bs-chips>
-                    <label class="chip-input-label visually-hidden" for="featureInput">Features</label>
-                    <input type="text" class="chip" name="features" readonly hidden>
-                    <input type="text" class="form-ghost" id="featureInput" placeholder="Add…" autocomplete="off">
+                <div class="chip-autocomplete" id="featurePicker">
+                    <div
+                            class="chip-input"
+                            data-bs-chips
+                            data-bs-create-on-blur="false"
+                            data-bs-separator=""
+                            data-feature-options='{{ feature_options | tojson }}'
+                    >
+                        <label class="chip-input-label visually-hidden" for="featureInput">
+                            Features
+                        </label>
+
+                        {% for feature in selected_features %}
+                        <span class="chip" data-bs-chip-value="{{ feature.name }}" tabindex="0">
+                            {{ feature.name }}
+                            <button type="button" class="chip-dismiss" aria-label="Remove" tabindex="-1">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16"
+                                     fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                                    <line x1="4" y1="4" x2="12" y2="12"></line>
+                                    <line x1="12" y1="4" x2="4" y2="12"></line>
+                                </svg>
+                            </button>
+                        </span>
+                        {% endfor %}
+
+                        <input
+                                type="text"
+                                class="form-ghost"
+                                id="featureInput"
+                                placeholder="Add…"
+                                autocomplete="off"
+                                role="combobox"
+                                aria-autocomplete="list"
+                                aria-controls="featureSuggestions"
+                                aria-expanded="false"
+                        >
+
+                        <div class="chip-suggestions" id="featureSuggestions" role="listbox" aria-label="Feature suggestions" hidden></div>
+                        <div class="visually-hidden" id="featureInputStatus" aria-live="polite"></div>
+                        <div data-chip-values></div>
+                    </div>
                 </div>
             </div>
 
