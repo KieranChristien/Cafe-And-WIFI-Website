@@ -39,7 +39,9 @@ def create_app() -> Flask:
     from web.models import Cafe, CafeAttribute
 
     # Register blueprints
+    from web.routes.listing import listing
     from web.routes.main import main
+    app.register_blueprint(listing)
     app.register_blueprint(main)
 
     return app

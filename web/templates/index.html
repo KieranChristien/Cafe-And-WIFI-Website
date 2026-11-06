@@ -1,5 +1,30 @@
 {% extends "base.html" %}
 
+{% macro dismiss_filter(label, href) %}
+<a
+        class="chip-dismiss"
+        href="{{ href }}"
+        data-preserve-scroll
+        aria-label="Remove {{ label }} filter"
+        title="Remove {{ label }}"
+>
+    <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="16"
+            height="16"
+            viewBox="0 0 16 16"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            aria-hidden="true"
+    >
+        <line x1="4" y1="4" x2="12" y2="12"/>
+        <line x1="12" y1="4" x2="4" y2="12"/>
+    </svg>
+</a>
+{% endmacro %}
+
 {% block content %}
 <!-- Search hero -->
 <section class="search-hero has-hero-img"
@@ -68,18 +93,67 @@
                     </div>
                 </div>
 
-                <div class="filter-bar mb-5">
-                    <span class="chip">open now <button type="button" class="chip-dismiss"
-                                                        aria-label="Remove open now filter"><svg
-                            xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none"
-                            stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line
-                            x1="4" y1="4" x2="12" y2="12"/><line x1="12" y1="4" x2="4" y2="12"/></svg></button></span>
-                    <span class="chip">4★ and up <button type="button" class="chip-dismiss"
-                                                         aria-label="Remove rating filter"><svg
-                            xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none"
-                            stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line
-                            x1="4" y1="4" x2="12" y2="12"/><line x1="12" y1="4" x2="4" y2="12"/></svg></button></span>
-                    <button class="btn-text btn-sm" type="button">Clear all</button>
+                <div class="filter-bar mb-5" id="filter-bar">
+
+                    {% if selected_rating > 0 %}
+                    <span class="chip">
+                        {{ selected_rating }}★ and up
+                        {{ dismiss_filter(
+                            'rating',
+                            remove_filter_url('rating')
+                        ) }}
+                    </span>
+                    {% endif %}
+
+                    {% for price in selected_prices %}
+                    <span class="chip">
+                        {{ price }}
+                        {{ dismiss_filter(
+                            'price',
+                            remove_filter_url('price', price)
+                        ) }}
+                    </span>
+                    {% endfor %}
+
+                    {% for feature in selected_features %}
+                    <span class="chip">
+                        {{ feature.name }}
+                        {{ dismiss_filter(
+                            feature.name,
+                            remove_filter_url('features', feature.slug)
+                        ) }}
+                    </span>
+                    {% endfor %}
+
+                    {% for amenity in selected_amenities %}
+                    <span class="chip">
+                        {{ amenity.name }}
+                        {{ dismiss_filter(
+                            amenity.name,
+                            remove_filter_url('amenities', amenity.slug)
+                        ) }}
+                    </span>
+                    {% endfor %}
+
+                    {% for payment in selected_payments %}
+                    <span class="chip">
+                        {{ payment.name }}
+                        {{ dismiss_filter(
+                            payment.name,
+                            remove_filter_url('payments', payment.slug)
+                        ) }}
+                    </span>
+                    {% endfor %}
+
+                    {% if selected_rating > 0 %}
+                    <a
+                            class="btn-text btn-sm"
+                            href="{{ url_for('main.home') }}"
+                    >
+                        Clear all
+                    </a>
+                    {% endif %}
+
                 </div>
 
                 <div class="row g-5">
@@ -105,7 +179,7 @@
                                 </div>
                             </div>
                             <div class="listing-body">
-                                <h3 class="listing-title"><a href="{{ url_for('main.listing', cafe_id=cafe.id) }}">{{
+                                <h3 class="listing-title"><a href="{{ url_for('listing.view', cafe_id=cafe.id) }}">{{
                                     cafe.name }}</a></h3>
                                 <div class="listing-meta mb-3">
                                     <span class="rating"><svg viewBox="0 0 16 16" fill="currentColor"
@@ -149,7 +223,7 @@
                         left_edge=1,
                         right_edge=1,
                         left_current=1,
-                        right_current=2
+                        right_current=1
                         ) %}
 
                         {% if page_num %}
@@ -201,8 +275,9 @@
                     </div>
                     <div class="p-4 bg-2 d-flex align-items-center gap-3">
                         <div class="form-field flex-grow-1">
-                            <div class="switch"><input type="checkbox" value="" id="mapMove" role="switch" switch
-                                                       checked></div>
+                            <div class="switch">
+                                <input type="checkbox" value="" id="mapMove" role="switch" switch checked>
+                            </div>
                             <label for="mapMove" class="fs-sm">Search as I move the map</label>
                         </div>
                     </div>
@@ -266,7 +341,7 @@
                 reviews only.</p>
             <div class="d-flex flex-wrap justify-content-center gap-4">
                 <a class="btn-solid theme-primary btn-lg" href="#">Add your business</a>
-                <a class="btn-outline theme-secondary btn-lg" href="listing.html">See an example</a>
+                <a class="btn-outline theme-secondary btn-lg" href="{{ url_for('listing.example') }}">See an example</a>
             </div>
         </div>
     </div>
@@ -280,106 +355,142 @@
     </div>
 
     <div class="drawer-body">
+        <form method="GET" action="{{ url_for('main.home', _anchor='results') }}">
+            <input type="hidden" name="filters_applied" value="1">
 
-        <div class="filter-drawer-group">
-            <h3 class="fs-sm fw-semibold mb-4">Minimum rating</h3>
-            <div class="form-range" data-bs-bubble>
-                <input type="range" class="form-range-input" id="ratingRange" min="1" max="5" step="0.5" value="4"
-                       aria-label="Minimum rating">
-            </div>
-            <p class="fs-xs fg-3 mb-0"><strong class="fg-1" id="ratingOut">4.0</strong> stars and up</p>
-        </div>
-
-        <div class="filter-drawer-group">
-            <h3 class="fs-sm fw-semibold mb-4">Price</h3>
-            <div class="option-row d-flex flex-wrap gap-3">
-                <label class="btn-check btn-outline theme-primary"><input type="checkbox"> €</label>
-                <label class="btn-check btn-outline theme-primary"><input type="checkbox" checked> €€</label>
-                <label class="btn-check btn-outline theme-primary"><input type="checkbox"> €€€</label>
-            </div>
-        </div>
-
-        <div class="filter-drawer-group">
-            <h3 class="fs-sm fw-semibold mb-4">Features</h3>
-            <div class="chip-input" id="featurePicker" data-bs-chips>
-                <label class="chip-input-label visually-hidden" for="featureInput">Features</label>
-                <input type="text" class="form-ghost" id="featureInput" placeholder="Add…" autocomplete="off">
-            </div>
-        </div>
-
-        <div class="filter-drawer-group">
-            <h3 class="fs-sm fw-semibold mb-4">Open on</h3>
-
-            <div class="form-control form-adorn">
-                <div class="form-adorn-icon">
-                    <svg width="16" height="16"
-                         viewBox="0 0 16 16"
-                         fill="none"
-                         stroke="currentColor"
-                         stroke-width="1.5"
-                         aria-hidden="true">
-                        <rect x="2" y="3.5" width="12" height="11" rx="1.5"/>
-                        <path d="M5 2v3M11 2v3M2 7h12"/>
-                    </svg>
+            <div class="filter-drawer-group">
+                <h3 class="fs-sm fw-semibold mb-4">Minimum rating</h3>
+                <div class="form-range" data-bs-bubble>
+                    <input
+                            type="range"
+                            class="form-range-input"
+                            id="ratingRange"
+                            name="rating"
+                            min="1"
+                            max="5"
+                            step="0.5"
+                            value="{{ selected_rating if selected_rating > 0 else '4' }}"
+                            aria-label="Minimum rating">
                 </div>
-
-                <input
-                        type="text"
-                        class="form-ghost"
-                        id="openDate"
-                        name="open_date"
-                        data-bs-toggle="datepicker"
-                        autocomplete="off"
-                        readonly
-                        placeholder="Choose a date…"
-                >
-
-                <button
-                        type="button"
-                        class="btn-icon btn-sm datepicker-clear"
-                        id="clearOpenDate"
-                        aria-label="Clear selected date"
-                        title="Clear date"
-                        hidden
-                >
-                    <svg width="16" height="16"
-                         viewBox="0 0 16 16"
-                         fill="none"
-                         stroke="currentColor"
-                         stroke-width="1.8"
-                         stroke-linecap="round"
-                         aria-hidden="true">
-                        <path d="M4 4l8 8M12 4l-8 8"/>
-                    </svg>
-                </button>
+                <p class="fs-xs fg-3 mb-0"><strong class="fg-1" id="ratingOut">4.0</strong> stars and up</p>
             </div>
-        </div>
 
-        <div class="filter-drawer-group">
-            <h3 class="fs-sm fw-semibold mb-4">Amenities</h3>
-
-            {% for amenity in cafe_amenities %}
-            <div class="form-field mb-3">
-                <input type="checkbox" class="check" id="amenity-{{ amenity.slug }}" name="amenities" value="{{ amenity.slug }}">
-                <label for="amenity-{{ amenity.slug }}">{{ amenity.name }}</label>
+            <div class="filter-drawer-group">
+                <h3 class="fs-sm fw-semibold mb-4">Price</h3>
+                <div class="option-row d-flex flex-wrap gap-3">
+                    <label class="btn-check btn-outline theme-primary">
+                        <input type="checkbox" name="price" value="€" {% if '€' in selected_prices %}checked{% endif %}>
+                        €
+                    </label>
+                    <label class="btn-check btn-outline theme-primary">
+                        <input type="checkbox" name="price" value="€€" {% if '€€' in selected_prices %}checked{% endif
+                        %}> €€
+                    </label>
+                    <label class="btn-check btn-outline theme-primary">
+                        <input type="checkbox" name="price" value="€€€" {% if '€€€' in selected_prices %}checked{% endif
+                        %}> €€€
+                    </label>
+                </div>
             </div>
-            {% endfor %}
-        </div>
 
-        <div class="filter-drawer-group">
-            <h3 class="fs-sm fw-semibold mb-4">Payment</h3>
-
-            {% for payment in cafe_payments %}
-            <div class="form-field mb-3">
-                <input type="checkbox" class="check" id="payment-{{ payment.slug }}" name="payments" value="{{ payment.slug }}">
-                <label for="payment-{{ payment.slug }}">{{ payment.name }}</label>
+            <div class="filter-drawer-group">
+                <h3 class="fs-sm fw-semibold mb-4">Features</h3>
+                <div class="chip-input" id="featurePicker" data-bs-chips>
+                    <label class="chip-input-label visually-hidden" for="featureInput">Features</label>
+                    <input type="text" class="chip" name="features" readonly hidden>
+                    <input type="text" class="form-ghost" id="featureInput" placeholder="Add…" autocomplete="off">
+                </div>
             </div>
-            {% endfor %}
-        </div>
 
-        <button class="btn-solid theme-primary w-100 mt-6" type="button" data-bs-dismiss="drawer">
-            Show 86 places
-        </button>
+            <div class="filter-drawer-group">
+                <h3 class="fs-sm fw-semibold mb-4">Open on</h3>
+
+                <div class="form-control form-adorn">
+                    <div class="form-adorn-icon">
+                        <svg width="16" height="16"
+                             viewBox="0 0 16 16"
+                             fill="none"
+                             stroke="currentColor"
+                             stroke-width="1.5"
+                             aria-hidden="true">
+                            <rect x="2" y="3.5" width="12" height="11" rx="1.5"/>
+                            <path d="M5 2v3M11 2v3M2 7h12"/>
+                        </svg>
+                    </div>
+
+                    <input
+                            type="text"
+                            class="form-ghost"
+                            id="openDate"
+                            name="open_date"
+                            data-bs-toggle="datepicker"
+                            autocomplete="off"
+                            readonly
+                            placeholder="Choose a date…"
+                            value="{{ selected_open_date }}"
+                    >
+
+                    <button
+                            type="button"
+                            class="btn-icon btn-sm datepicker-clear"
+                            id="clearOpenDate"
+                            aria-label="Clear selected date"
+                            title="Clear date"
+                            hidden
+                    >
+                        <svg width="16" height="16"
+                             viewBox="0 0 16 16"
+                             fill="none"
+                             stroke="currentColor"
+                             stroke-width="1.8"
+                             stroke-linecap="round"
+                             aria-hidden="true">
+                            <path d="M4 4l8 8M12 4l-8 8"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <div class="filter-drawer-group">
+                <h3 class="fs-sm fw-semibold mb-4">Amenities</h3>
+
+                {% for amenity in cafe_amenities %}
+                <div class="form-field mb-3">
+                    <input
+                            type="checkbox"
+                            class="check"
+                            id="amenity-{{ amenity.slug }}"
+                            name="amenities"
+                            value="{{ amenity.slug }}"
+                            {% if amenity in selected_amenities %}checked{% endif %}
+                    >
+                    <label for="amenity-{{ amenity.slug }}">{{ amenity.name }}</label>
+                </div>
+                {% endfor %}
+            </div>
+
+            <div class="filter-drawer-group">
+                <h3 class="fs-sm fw-semibold mb-4">Payment</h3>
+
+                {% for payment in cafe_payments %}
+                <div class="form-field mb-3">
+                    <input
+                            type="checkbox"
+                            class="check"
+                            id="payment-{{ payment.slug }}"
+                            name="payments"
+                            value="{{ payment.slug }}"
+                            {% if payment in selected_payments %}checked{% endif %}
+                    >
+                    <label for="payment-{{ payment.slug }}">{{ payment.name }}</label>
+                </div>
+                {% endfor %}
+            </div>
+
+            <button class="btn-solid theme-primary w-100 mt-6" type="submit" data-bs-dismiss="drawer">
+                Show 86 places
+            </button>
+        </form>
     </div>
 </dialog>
 {% endblock %}

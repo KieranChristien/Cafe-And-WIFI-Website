@@ -22,24 +22,87 @@ const initDatepickerDialogFix = () => {
     const positionPopup = (instance) => {
         if (!instance._isShown) return
 
-        const input = instance._positionElement || instance._element
-        const dialog = instance._element.closest('dialog[open]')
+        // Use the actual input, not Bootstrap's .form-adorn wrapper.
+        const input = instance._element
+        const dialog = input.closest('dialog[open]')
         const popup = instance._calendar?.context?.mainElement
 
-        if (!dialog || !popup) return
+        if (!dialog || !popup || popup === input) return
 
         if (popup.parentElement !== dialog) {
+            console.log({
+                input,
+                inputParent: input.parentElement,
+                popup,
+                popupContainsInput: popup.contains(input),
+                popupParent: popup.parentElement,
+                formControl: input.closest('.form-control')
+            })
+
             dialog.append(popup)
         }
 
         const inputRect = input.getBoundingClientRect()
         const dialogRect = dialog.getBoundingClientRect()
 
-        popup.style.left =
-            `${inputRect.left - dialogRect.left - dialog.clientLeft}px`
+        const gap = 8
 
-        popup.style.top =
-            `${inputRect.bottom - dialogRect.top - dialog.clientTop}px`
+        // Coordinates relative to the dialog's content area.
+        const inputTop =
+            inputRect.top - dialogRect.top - dialog.clientTop
+
+        const inputBottom =
+            inputRect.bottom - dialogRect.top - dialog.clientTop
+
+        const inputLeft =
+            inputRect.left - dialogRect.left - dialog.clientLeft
+
+        // Calendar dimensions.
+        const popupWidth = popup.offsetWidth
+        const popupHeight = popup.offsetHeight
+
+        // Centre the calendar horizontally against the input.
+        const centeredLeft =
+            inputLeft + (inputRect.width - popupWidth) / 2
+
+        // Keep the calendar within the dialog horizontally.
+        const maxLeft = Math.max(
+            gap,
+            dialog.clientWidth - popupWidth - gap
+        )
+
+        const left = Math.max(
+            gap,
+            Math.min(centeredLeft, maxLeft)
+        )
+
+        // Available vertical space.
+        const spaceAbove = inputTop
+        const spaceBelow = dialog.clientHeight - inputBottom
+
+        const fitsBelow = popupHeight + gap <= spaceBelow
+        const fitsAbove = popupHeight + gap <= spaceAbove
+
+        const openAbove =
+            !fitsBelow && (fitsAbove || spaceAbove > spaceBelow)
+
+        const desiredTop = openAbove
+            ? inputTop - popupHeight - gap
+            : inputBottom + gap
+
+        // Keep the calendar within the dialog vertically.
+        const maxTop = Math.max(
+            gap,
+            dialog.clientHeight - popupHeight - gap
+        )
+
+        const top = Math.max(
+            gap,
+            Math.min(desiredTop, maxTop)
+        )
+
+        popup.style.left = `${left}px`
+        popup.style.top = `${top}px`
     }
 
     // Throttle repositioning to one update per animation frame.
@@ -84,13 +147,33 @@ const initDatepickerDialogFix = () => {
         const originalOnShow = options.onShow
 
         options.onShow = (...callbackArgs) => {
-            originalOnShow?.(...callbackArgs)
-
             const dialog = this._element.closest('dialog[open]')
 
-            if (!dialog) return
+            if (!dialog) {
+                originalOnShow?.(...callbackArgs)
+                return
+            }
 
-            positionPopup(this)
+            const drawerBody = dialog.querySelector('.drawer-body')
+
+            // Preserve the drawer's current scroll position.
+            const scrollTop = drawerBody?.scrollTop ?? 0
+            const dialogScrollTop = dialog.scrollTop
+            const windowScrollY = window.scrollY
+
+            originalOnShow?.(...callbackArgs)
+
+            // Undo any automatic scrolling caused by calendar focus.
+            if (drawerBody) {
+                drawerBody.scrollTop = scrollTop
+            }
+
+            dialog.scrollTop = dialogScrollTop
+            window.scrollTo(window.scrollX, windowScrollY)
+
+            // Reposition after the browser has completed layout.
+            schedulePosition(this)
+
             bindScrollListeners(this, dialog)
         }
 
@@ -156,23 +239,58 @@ const initMapSync = () => {
     })
 }
 
+
+const parseInitialDate = (value) => {
+    const match = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(value.trim())
+
+    if (!match) return null
+
+    const [, dayText, monthText, yearText] = match
+
+    const day = Number(dayText)
+    const month = Number(monthText)
+    const year = Number(yearText)
+
+    // Validate the date rather than accepting rollover dates.
+    const date = new Date(year, month - 1, day)
+
+    if (
+        date.getFullYear() !== year ||
+        date.getMonth() !== month - 1 ||
+        date.getDate() !== day
+    ) {
+        return null
+    }
+
+    return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+}
+
 const initOpenDatepicker = () => {
     const input = document.getElementById('openDate')
-
     if (!input) return
 
+    // Capture the server-provided date before initialising Bootstrap.
+    const initialValue = input.value.trim()
+    const initialDate = parseInitialDate(initialValue)
+
+    // Prevent Bootstrap from parsing the input and prematurely calling
+    // calendar.set() during input-mode initialisation.
+    input.value = ''
+
     const picker = Datepicker.getOrCreateInstance(input, {
+        locale: 'en-GB',
+        positionElement: input,
+        selectedDates: initialDate ? [initialDate] : [],
+
         vcpOptions: {
             openOnFocus: false
         }
     })
 
-    // Prevent Vanilla Calendar Pro from handling the input click.
-    // Bootstrap will handle opening the calendar instead.
-    input.addEventListener('click', (event) => {
-        event.stopImmediatePropagation()
-        picker.show()
-    }, true)
+    // Preserve an unrecognised value rather than silently discarding it.
+    if (!initialDate && initialValue) {
+        input.value = initialValue
+    }
 
     const clearButton = document.getElementById('clearOpenDate')
 
@@ -181,10 +299,7 @@ const initOpenDatepicker = () => {
             clearButton.hidden = !input.value.trim()
         }
 
-        // Update when Bootstrap reports a selected date.
         input.addEventListener('change.bs.datepicker', syncClearButton)
-
-        // Handle an initially populated input.
         syncClearButton()
 
         clearButton.addEventListener('click', (event) => {
@@ -194,7 +309,6 @@ const initOpenDatepicker = () => {
             picker.hide()
             picker.setSelectedDates([])
 
-            // Notify other code that the date has changed.
             input.dispatchEvent(new Event('input', {bubbles: true}))
             input.dispatchEvent(new Event('change', {bubbles: true}))
 
@@ -203,9 +317,74 @@ const initOpenDatepicker = () => {
     }
 }
 
+
+const copyToClipboard = async (text) => {
+    // Prefer the modern Clipboard API.
+    if (navigator.clipboard?.writeText) {
+        try {
+            await navigator.clipboard.writeText(text)
+            return
+        } catch (error) {
+            // Fall back if clipboard permissions are unavailable.
+        }
+    }
+
+    // Fallback for browsers without Clipboard API support.
+    const textarea = document.createElement('textarea')
+
+    textarea.value = text
+    textarea.setAttribute('readonly', '')
+    textarea.style.position = 'fixed'
+    textarea.style.opacity = '0'
+
+    document.body.append(textarea)
+
+    textarea.focus()
+    textarea.select()
+    textarea.setSelectionRange(0, textarea.value.length)
+
+    let copied = false
+
+    try {
+        copied = document.execCommand?.('copy') ?? false
+    } finally {
+        textarea.remove()
+    }
+
+    if (!copied) {
+        throw new Error('Unable to copy URL to clipboard')
+    }
+}
+
+const initShareButton = () => {
+    const button = document.querySelector('[data-share-url]')
+    const status = document.getElementById('shareStatus')
+
+    if (!button) return
+
+    button.addEventListener('click', async () => {
+        try {
+            await copyToClipboard(window.location.href)
+
+            if (status) {
+                status.textContent = 'Page URL copied to clipboard!'
+            }
+        } catch (error) {
+            if (status) {
+                status.textContent =
+                    'Unable to copy URL. Please copy it from your address bar.'
+            }
+
+            console.error('Share button error:', error)
+        }
+    })
+}
+
+
 onReady(() => {
     initBase()
     bindRange('ratingRange', 'ratingOut', (v) => Number(v).toFixed(1))
     initMapSync()
     initOpenDatepicker()
+    initShareButton()
 })
