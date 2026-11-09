@@ -20,6 +20,11 @@ def create_app() -> Flask:
 
     app.config['SECRET_KEY'] = secret_key
 
+    # Debug configuration
+    app.config["DEBUG"] = env.get(
+        "FLASK_DEBUG", "false"
+    ).strip().lower() in {"1", "true", "yes", "on"}
+
     database_url = env.get('DATABASE_URI')
     if not database_url:
         raise RuntimeError("DATABASE_URI is not configured")
