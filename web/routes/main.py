@@ -1,7 +1,7 @@
-from flask import Blueprint, current_app, flash, jsonify, redirect, render_template, request, url_for
+from flask import Blueprint, jsonify, render_template, request, url_for
 
 from web.extensions import db
-from web.models import Cafe, CafeAttribute
+from web.models import Cafe, CafeAttribute, get_review_stats, CafeReview
 
 main = Blueprint('main', __name__)
 
@@ -117,6 +117,7 @@ def home():
     page = request.args.get('page', 1, type=int)
     per_page = 4
 
+    # Retrieve and paginate cafés.
     stmt = _get_filtered_cafes().order_by(Cafe.id.asc())
 
     pagination = db.paginate(
@@ -125,6 +126,40 @@ def home():
         per_page=per_page,
         error_out=False
     )
+
+    cafe_ids = [cafe.id for cafe in pagination.items]
+
+    review_stats = {}
+
+    if cafe_ids:
+        results = db.session.execute(
+            db.select(
+                CafeReview.cafe_id,
+                db.func.avg(CafeReview.rating).label("average_rating"),
+                db.func.count(CafeReview.id).label("review_count"),
+            )
+            .where(CafeReview.cafe_id.in_(cafe_ids))
+            .group_by(CafeReview.cafe_id)
+        ).all()
+
+        review_stats = {
+            cafe_id: (average_rating, review_count)
+            for cafe_id, average_rating, review_count in results
+        }
+
+    cafes = []
+
+    for cafe in pagination.items:
+        average_rating, review_count = review_stats.get(
+            cafe.id,
+            (None, 0)
+        )
+
+        cafes.append({
+            "cafe": cafe,
+            "average_rating": average_rating,
+            "review_count": review_count,
+        })
 
     cafe_amenities = db.session.execute(
         db.select(CafeAttribute).where(CafeAttribute.category == "amenity")
@@ -145,6 +180,8 @@ def home():
         }
         for feature in cafe_features
     ]
+
+    filters_applied = request.args.get('filters_applied', False, type=bool)
 
     selected_amenity_slugs = request.args.getlist('amenities')
     selected_payment_slugs = request.args.getlist('payments')
@@ -168,9 +205,19 @@ def home():
     selected_rating = request.args.get('rating', -1, type=float)
     selected_open_date = request.args.get('open_date', '')
 
+    filters = {
+        "applied": filters_applied,
+        "amenities": selected_amenities,
+        "payments": selected_payments,
+        "features": selected_features,
+        "price": selected_prices,
+        "rating": selected_rating,
+        "open_date": selected_open_date,
+    }
+
     return render_template(
         "index.html",
-        cafes=pagination.items,
+        cafes=cafes,
         pagination=pagination,
         pagination_url=_pagination_url,
         remove_filter_url=_remove_filter_url,
@@ -178,12 +225,7 @@ def home():
         cafe_features=cafe_features,
         cafe_payments=cafe_payments,
         feature_options=feature_options,
-        selected_amenities=selected_amenities,
-        selected_payments=selected_payments,
-        selected_features=selected_features,
-        selected_prices=selected_prices,
-        selected_rating=selected_rating,
-        selected_open_date=selected_open_date,
+        filters=filters
     )
 
 

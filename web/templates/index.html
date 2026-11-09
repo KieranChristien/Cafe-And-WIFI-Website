@@ -95,9 +95,9 @@
 
                 <div class="filter-bar mb-5" id="filter-bar">
 
-                    {% if selected_rating > 0 %}
+                    {% if filters.rating > 0 %}
                     <span class="chip">
-                        {{ selected_rating }}★ and up
+                        {{ filters.rating }}★ and up
                         {{ dismiss_filter(
                             'rating',
                             remove_filter_url('rating')
@@ -105,7 +105,7 @@
                     </span>
                     {% endif %}
 
-                    {% for price in selected_prices %}
+                    {% for price in filters.prices %}
                     <span class="chip">
                         {{ price }}
                         {{ dismiss_filter(
@@ -115,7 +115,7 @@
                     </span>
                     {% endfor %}
 
-                    {% for feature in selected_features %}
+                    {% for feature in filters.features %}
                     <span class="chip">
                         {{ feature.name }}
                         {{ dismiss_filter(
@@ -125,7 +125,7 @@
                     </span>
                     {% endfor %}
 
-                    {% for amenity in selected_amenities %}
+                    {% for amenity in filters.amenities %}
                     <span class="chip">
                         {{ amenity.name }}
                         {{ dismiss_filter(
@@ -135,7 +135,7 @@
                     </span>
                     {% endfor %}
 
-                    {% for payment in selected_payments %}
+                    {% for payment in filters.payments %}
                     <span class="chip">
                         {{ payment.name }}
                         {{ dismiss_filter(
@@ -145,7 +145,7 @@
                     </span>
                     {% endfor %}
 
-                    {% if selected_rating > 0 %}
+                    {% if filters.applied %}
                     <a
                             class="btn-text btn-sm"
                             href="{{ url_for('main.home') }}"
@@ -158,7 +158,8 @@
 
                 <div class="row g-5">
 
-                    {% for cafe in cafes %}
+                    {% for item in cafes %}
+                    {% set cafe = item.cafe %}
                     <div class="md:col-6">
                         <article class="listing surface lift">
                             <div class="listing-media">
@@ -182,10 +183,21 @@
                                 <h3 class="listing-title"><a href="{{ url_for('listing.view', cafe_id=cafe.id) }}">{{
                                     cafe.name }}</a></h3>
                                 <div class="listing-meta mb-3">
-                                    <span class="rating"><svg viewBox="0 0 16 16" fill="currentColor"
-                                                              aria-hidden="true"><path
-                                            d="m8 1.5 1.9 4 4.35.6-3.15 3.05.76 4.35L8 11.45 4.14 13.5l.76-4.35L1.75 6.1 6.1 5.5z"/></svg>4.6</span>
-                                    <span>(548)</span><span aria-hidden="true">·</span><span>{{ cafe.location }}</span>
+                                    <span class="rating">
+                                        <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                                        <path d="m8 1.5 1.9 4 4.35.6-3.15 3.05.76 4.35L8 11.45 4.14 13.5l.76-4.35L1.75 6.1 6.1 5.5z"/>
+                                        </svg>
+                                        {{ item.average_rating }}
+                                    </span>
+                                    <span>
+                                        ({{ item.review_count }})
+                                    </span>
+                                    <span aria-hidden="true">
+                                        ·
+                                    </span>
+                                    <span>
+                                        {{ cafe.location }}
+                                    </span>
                                 </div>
                                 <p class="fg-2 fs-sm mb-4">Four tables, one menu, whatever the market had that morning.
                                     Book two weeks out.</p>
@@ -369,7 +381,7 @@
                             min="1"
                             max="5"
                             step="0.5"
-                            value="{{ selected_rating if selected_rating > 0 else '4' }}"
+                            value="{{ filters.rating if filters_applied else '4' }}"
                             aria-label="Minimum rating">
                 </div>
                 <p class="fs-xs fg-3 mb-0"><strong class="fg-1" id="ratingOut">4.0</strong> stars and up</p>
@@ -379,15 +391,15 @@
                 <h3 class="fs-sm fw-semibold mb-4">Price</h3>
                 <div class="option-row d-flex flex-wrap gap-3">
                     <label class="btn-check btn-outline theme-primary">
-                        <input type="checkbox" name="price" value="€" {% if '€' in selected_prices %}checked{% endif %}>
+                        <input type="checkbox" name="price" value="€" {% if '€' in filters.prices %}checked{% endif %}>
                         €
                     </label>
                     <label class="btn-check btn-outline theme-primary">
-                        <input type="checkbox" name="price" value="€€" {% if '€€' in selected_prices %}checked{% endif
+                        <input type="checkbox" name="price" value="€€" {% if '€€' in filters.prices %}checked{% endif
                         %}> €€
                     </label>
                     <label class="btn-check btn-outline theme-primary">
-                        <input type="checkbox" name="price" value="€€€" {% if '€€€' in selected_prices %}checked{% endif
+                        <input type="checkbox" name="price" value="€€€" {% if '€€€' in filters.prices %}checked{% endif
                         %}> €€€
                     </label>
                 </div>
@@ -407,7 +419,7 @@
                             Features
                         </label>
 
-                        {% for feature in selected_features %}
+                        {% for feature in filters.features %}
                         <span class="chip" data-bs-chip-value="{{ feature.name }}" tabindex="0">
                             {{ feature.name }}
                             <button type="button" class="chip-dismiss" aria-label="Remove" tabindex="-1">
@@ -464,7 +476,7 @@
                             autocomplete="off"
                             readonly
                             placeholder="Choose a date…"
-                            value="{{ selected_open_date }}"
+                            value="{{ filters['open_date'] }}"
                     >
 
                     <button
@@ -499,7 +511,7 @@
                             id="amenity-{{ amenity.slug }}"
                             name="amenities"
                             value="{{ amenity.slug }}"
-                            {% if amenity in selected_amenities %}checked{% endif %}
+                            {% if amenity in filters.amenities %}checked{% endif %}
                     >
                     <label for="amenity-{{ amenity.slug }}">{{ amenity.name }}</label>
                 </div>
@@ -517,7 +529,7 @@
                             id="payment-{{ payment.slug }}"
                             name="payments"
                             value="{{ payment.slug }}"
-                            {% if payment in selected_payments %}checked{% endif %}
+                            {% if payment in filters.payments %}checked{% endif %}
                     >
                     <label for="payment-{{ payment.slug }}">{{ payment.name }}</label>
                 </div>

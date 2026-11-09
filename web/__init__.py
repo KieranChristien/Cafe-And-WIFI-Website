@@ -3,7 +3,8 @@ from dotenv import load_dotenv
 from flask import Flask
 from flask_bootstrap import Bootstrap4
 
-from web.extensions import db, migrate
+from web.extensions import db, migrate, limiter
+
 
 def create_app() -> Flask:
     load_dotenv()
@@ -34,6 +35,7 @@ def create_app() -> Flask:
     Bootstrap4(app)
     db.init_app(app)
     migrate.init_app(app, db)
+    limiter.init_app(app)
 
     # Import models so SQLAlchemy registers them with metadata
     from web.models import Cafe, CafeAttribute

@@ -35,11 +35,28 @@
                         </div>
                         <h1 class="fs-4xl fw-bold mb-3" style="letter-spacing:-.03em">{{ cafe.name }}</h1>
                         <div class="listing-meta">
-                            <span class="rating"><svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path
-                                    d="m8 1.5 1.9 4 4.35.6-3.15 3.05.76 4.35L8 11.45 4.14 13.5l.76-4.35L1.75 6.1 6.1 5.5z"/></svg>4.8</span>
-                            <span>(312 reviews)</span><span aria-hidden="true">&#183;</span><span>Coffee</span><span
-                                aria-hidden="true">&#183;</span><span>{{ cafe.location }}</span><span
-                                aria-hidden="true">&#183;</span><span>&#8364;&#8364;</span>
+                            <span class="rating">
+                                <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                                    <path d="m8 1.5 1.9 4 4.35.6-3.15 3.05.76 4.35L8 11.45 4.14 13.5l.76-4.35L1.75 6.1 6.1 5.5z"/>
+                                </svg>
+                                {{ cafe.average_rating }}
+                            </span>
+                            {% set review_count = cafe.reviews|length %}
+                            <span>
+                                ({{ review_count }} {{ 'review' if review_count == 1 else 'reviews' }})
+                            </span>
+                            <span aria-hidden="true">
+                                &#183;
+                            </span>
+                            <span>
+                                {{ cafe.location }}
+                            </span>
+                            <span aria-hidden="true">
+                                &#183;
+                            </span>
+                            <span>
+                                &#8364;&#8364;
+                            </span>
                         </div>
                     </div>
                     <div class="d-flex gap-3">
@@ -109,55 +126,49 @@
                     </div>
                     <div class="tab-pane fade" id="rv" role="tabpanel" aria-labelledby="rv-tab" tabindex="0">
                         <div class="vstack gap-5" style="max-width:44rem">
+                            {% for review in cafe.reviews %}
                             <figure class="surface surface-pad mb-0">
-                                <div class="stars mb-4" role="img" aria-label="5 out of 5">
+                                <div class="stars mb-4" role="img" aria-label="{{ review.rating }} out of 5">
+                                    {% for _ in range(review.rating) %}
                                     <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
                                         <path d="m8 1.5 1.9 4 4.35.6-3.15 3.05.76 4.35L8 11.45 4.14 13.5l.76-4.35L1.75 6.1 6.1 5.5z"/>
                                     </svg>
-                                    <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-                                        <path d="m8 1.5 1.9 4 4.35.6-3.15 3.05.76 4.35L8 11.45 4.14 13.5l.76-4.35L1.75 6.1 6.1 5.5z"/>
-                                    </svg>
-                                    <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-                                        <path d="m8 1.5 1.9 4 4.35.6-3.15 3.05.76 4.35L8 11.45 4.14 13.5l.76-4.35L1.75 6.1 6.1 5.5z"/>
-                                    </svg>
-                                    <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-                                        <path d="m8 1.5 1.9 4 4.35.6-3.15 3.05.76 4.35L8 11.45 4.14 13.5l.76-4.35L1.75 6.1 6.1 5.5z"/>
-                                    </svg>
-                                    <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-                                        <path d="m8 1.5 1.9 4 4.35.6-3.15 3.05.76 4.35L8 11.45 4.14 13.5l.76-4.35L1.75 6.1 6.1 5.5z"/>
-                                    </svg>
+                                    {% endfor %}
                                 </div>
-                                <blockquote class="mb-4">&quot;Best filter in Ghent and it isn&#8217;t close. Bring
-                                    cash, bring patience, don&#8217;t bring a laptop on Saturday.&quot;
+                                <blockquote class="mb-4">
+                                    "{{ review.body }}"
                                 </blockquote>
-                                <figcaption class="d-flex align-items-center gap-4"><span class="avatar"><span
-                                        class="avatar-initials">JW</span></span><span><span
-                                        class="d-block fw-semibold fs-sm">Joris W.</span><span
-                                        class="d-block fg-3 fs-xs">42 reviews</span></span></figcaption>
+                                <figcaption class="d-flex align-items-center gap-4">
+                                    <span class="avatar">
+                                        <span class="avatar-initials">
+                                            {% set names = review.name.split() %}
+
+                                            {% if names %}
+                                                {% set initials = names[0][0] ~ (names[-1][0] if names|length > 1 else names[0][1:2]) %}
+                                                {{ initials|upper }}
+                                            {% else %}
+                                                ?
+                                            {% endif %}
+                                        </span>
+                                    </span>
+                                    <span>
+                                        <span class="d-block fw-semibold fs-sm">
+                                           {% if names %}
+                                                {% set name = names[0] ~ " " ~ (names[-1][0] if names|length > 1 else names[0]) ~ "." %}
+                                                {{ name|title }}
+                                            {% else %}
+                                                ?
+                                            {% endif %}
+                                        </span>
+                                        <span class="d-block fg-3 fs-xs">
+                                            42 reviews
+                                        </span>
+                                    </span>
+                                </figcaption>
                             </figure>
-                            <figure class="surface surface-pad mb-0">
-                                <div class="stars mb-4" role="img" aria-label="4 out of 5">
-                                    <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-                                        <path d="m8 1.5 1.9 4 4.35.6-3.15 3.05.76 4.35L8 11.45 4.14 13.5l.76-4.35L1.75 6.1 6.1 5.5z"/>
-                                    </svg>
-                                    <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-                                        <path d="m8 1.5 1.9 4 4.35.6-3.15 3.05.76 4.35L8 11.45 4.14 13.5l.76-4.35L1.75 6.1 6.1 5.5z"/>
-                                    </svg>
-                                    <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-                                        <path d="m8 1.5 1.9 4 4.35.6-3.15 3.05.76 4.35L8 11.45 4.14 13.5l.76-4.35L1.75 6.1 6.1 5.5z"/>
-                                    </svg>
-                                    <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-                                        <path d="m8 1.5 1.9 4 4.35.6-3.15 3.05.76 4.35L8 11.45 4.14 13.5l.76-4.35L1.75 6.1 6.1 5.5z"/>
-                                    </svg>
-                                </div>
-                                <blockquote class="mb-4">&quot;Genuinely excellent coffee, genuinely three seats. Factor
-                                    in a wait or take it away.&quot;
-                                </blockquote>
-                                <figcaption class="d-flex align-items-center gap-4"><span class="avatar"><span
-                                        class="avatar-initials">ML</span></span><span><span
-                                        class="d-block fw-semibold fs-sm">Maren L.</span><span
-                                        class="d-block fg-3 fs-xs">7 reviews</span></span></figcaption>
-                            </figure>
+                            {% else %}
+                            <p class="fg-2">No reviews yet. Be the first to leave one!</p>
+                            {% endfor %}
                         </div>
                     </div>
                     <div class="tab-pane fade" id="phts" role="tabpanel" aria-labelledby="ph-tab" tabindex="0">
@@ -213,27 +224,48 @@
                     <hr class="mb-5">
 
                     <h2 class="fs-sm fw-semibold mb-4">Leave a review</h2>
-                    <form id="reviewForm" data-demo-form data-bs-validate novalidate>
+                    <form
+                            id="reviewForm"
+                            method="POST"
+                            action="{{ url_for('listing.view', cafe_id=cafe.id) }}"
+                            data-bs-validate
+                            novalidate
+                    >
+                        {{ form.hidden_tag() }}
+
                         <div class="form-field mb-4">
-                            <label class="form-label" for="rvName">Name</label>
-                            <input type="text" class="form-control" id="rvName" required>
-                            <div class="invalid-feedback">Required.</div>
-                        </div>
-                        <div class="mb-4">
-                            <label class="form-label" for="rvScore">Rating</label>
-                            <div class="form-range" data-bs-bubble>
-                                <input type="range" class="form-range-input" id="rvScore" min="1" max="5" step="1"
-                                       value="5" aria-label="Your rating">
+                            {{ form.name.label(class="form-label", for="rvName") }}
+
+                            {{ form.name(class="form-control", id="rvName") }}
+
+                            <div class="invalid-feedback{% if form.name.errors %} d-block{% endif %}">
+                                {{ form.name.errors[0] if form.name.errors else "Please enter your name." }}
                             </div>
                         </div>
-                        <div class="form-field mb-4">
-                            <label class="form-label" for="rvText">Your review</label>
-                            <textarea class="form-control" id="rvText" rows="3" required></textarea>
-                            <div class="invalid-feedback">Tell people what it&#8217;s like.</div>
+
+                        <div class="mb-4">
+                            {{ form.rating.label(class="form-label", for="rvScore") }}
+
+                            <div class="form-range" data-bs-bubble>
+                                {{ form.rating(class="form-range-input", id="rvScore", aria_label="Your rating") }}
+                            </div>
+
+                            <div class="invalid-feedback{% if form.rating.errors %} d-block{% endif %}">
+                                {{ form.rating.errors[0] if form.rating.errors else "Please rate the café." }}
+                            </div>
                         </div>
-                        <button class="btn-solid theme-primary w-100" type="submit"
-                                data-done-text="Review posted &#10003;">Post review
-                        </button>
+
+                        <div class="form-field mb-4">
+                            {{ form.body.label(class="form-label", for="rvText") }}
+
+                            {{ form.body(class="form-control", id="rvText", rows="3") }}
+
+                            <div class="invalid-feedback{% if form.body.errors %} d-block{% endif %}">
+                                {{ form.body.errors[0] if form.body.errors else "Tell people what it's like." }}
+                            </div>
+                        </div>
+
+                        {{ form.submit(class="btn-solid theme-primary w-100") }}
                     </form>
                 </div>
             </aside>
