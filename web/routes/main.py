@@ -210,7 +210,7 @@ def home():
         "amenities": selected_amenities,
         "payments": selected_payments,
         "features": selected_features,
-        "price": selected_prices,
+        "prices": selected_prices,
         "rating": selected_rating,
         "open_date": selected_open_date,
     }
