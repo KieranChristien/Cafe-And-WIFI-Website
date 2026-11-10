@@ -1,9 +1,11 @@
-from typing import Optional
+from typing import Literal, Optional
 
-from sqlalchemy import CheckConstraint, ForeignKey, Integer, String, select, func
+from sqlalchemy import CheckConstraint, ForeignKey, Integer, String, select, func, Select
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from web.extensions import db
+
+AttributeCategory = Literal["amenity", "feature", "payment"]
 
 # Association table connecting cafés and attributes
 cafe_attributes = db.Table(
@@ -73,11 +75,6 @@ class Cafe(db.Model):
 
     @property
     def average_rating(self) -> float | None:
-        reviews = self.reviews
-
-        if not reviews:
-            return None
-
         return db.session.scalar(
             select(func.avg(CafeReview.rating))
             .where(CafeReview.cafe_id == self.id)
@@ -155,12 +152,18 @@ class CafeAttribute(db.Model):
         nullable=False
     )
     slug: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
-    category: Mapped[str] = mapped_column(String(50), nullable=False)
+    category: Mapped[AttributeCategory] = mapped_column(String(50), nullable=False)
 
     cafes: Mapped[list["Cafe"]] = relationship(
         secondary=cafe_attributes,
         back_populates="attributes"
     )
+
+    @classmethod
+    def get_by_category(cls, category: AttributeCategory) -> list["CafeAttribute"]:
+        return db.session.scalars(
+            select(cls).where(cls.category == category)
+        ).all()
 
     def to_dict(self):
         return {
@@ -182,7 +185,7 @@ class CafeReview(db.Model):
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    cafe_id: Mapped[Optional[int]] = mapped_column(
+    cafe_id: Mapped[int] = mapped_column(
         ForeignKey("cafe.id"),
         nullable=False,
         index=True,
@@ -200,7 +203,7 @@ class CafeReview(db.Model):
         nullable=False
     )
 
-    cafe: Mapped[Optional["Cafe"]] = relationship(
+    cafe: Mapped["Cafe"] = relationship(
         back_populates="reviews"
     )
 
@@ -248,13 +251,71 @@ def remove_attribute(cafe_id: int, attribute_slug: str) -> bool:
 
     return cafe.remove_attribute(attribute)
 
-def get_review_stats():
-    return (
-        db.select(
-            CafeReview.cafe_id.label("cafe_id"),
-            func.avg(CafeReview.rating).label("average_rating"),
-            func.count(CafeReview.id).label("review_count"),
+
+def filter_by_attribute(
+        stmt: Select[tuple[Cafe]],
+        attributes: list[str],
+        category: AttributeCategory | None = None
+) -> Select[tuple[Cafe]]:
+    for slug in attributes:
+        if not slug:
+            continue
+
+        criterion = CafeAttribute.slug == slug
+        if category is not None:
+            criterion = db.and_(
+                CafeAttribute.category == category,
+                criterion,
+            )
+
+        stmt = stmt.where(
+            Cafe.attributes.any(criterion)
         )
-        .group_by(CafeReview.cafe_id)
-        .subquery()
-    )
+
+    return stmt
+
+
+def get_attributes_from_slugs(category: AttributeCategory, attribute_slugs: list[str]) -> list[CafeAttribute]:
+    if not attribute_slugs:
+        return []
+
+    attributes = db.session.scalars(
+        select(CafeAttribute).where(
+            CafeAttribute.category == category,
+            CafeAttribute.slug.in_(attribute_slugs),
+        )
+    ).all()
+
+    # Preserve the order in which the user selected them.
+    attributes_by_slug = {
+        attribute.slug: attribute
+        for attribute in attributes
+    }
+
+    return [
+        attributes_by_slug[slug]
+        for slug in dict.fromkeys(attribute_slugs)
+        if slug in attributes_by_slug
+    ]
+
+
+def get_review_stats(cafe_ids: list[int]) -> dict[int, tuple[float | None, int]]:
+    review_stats = {}
+
+    if cafe_ids:
+        results = db.session.execute(
+            db.select(
+                CafeReview.cafe_id,
+                db.func.avg(CafeReview.rating).label("average_rating"),
+                db.func.count(CafeReview.id).label("review_count"),
+            )
+            .where(CafeReview.cafe_id.in_(cafe_ids))
+            .group_by(CafeReview.cafe_id)
+        ).all()
+
+        review_stats = {
+            cafe_id: (average_rating, review_count)
+            for cafe_id, average_rating, review_count in results
+        }
+
+    return review_stats

@@ -1,7 +1,7 @@
 from flask import Blueprint, jsonify, render_template, request, url_for
 
 from web.extensions import db
-from web.models import Cafe, CafeAttribute, get_review_stats, CafeReview
+from web.models import Cafe, CafeAttribute, filter_by_attribute, get_attributes_from_slugs, get_review_stats
 
 main = Blueprint('main', __name__)
 
@@ -14,72 +14,11 @@ def _get_filtered_cafes():
     features = request.args.getlist('features')
 
     # Every selected amenity must match
-    for slug in amenities:
-        if not slug:
-            continue
-
-        stmt = stmt.where(
-            Cafe.attributes.any(
-                db.and_(
-                    CafeAttribute.category == 'amenity',
-                    CafeAttribute.slug == slug
-                )
-            )
-        )
-
-    # Every selected payment method must match
-    for slug in payments:
-        if not slug:
-            continue
-
-        stmt = stmt.where(
-            Cafe.attributes.any(
-                db.and_(
-                    CafeAttribute.category == 'payment',
-                    CafeAttribute.slug == slug
-                )
-            )
-        )
-
-    # Every selected feature must match
-    for slug in features:
-        if not slug:
-            continue
-
-        stmt = stmt.where(
-            Cafe.attributes.any(
-                db.and_(
-                    CafeAttribute.category == 'feature',
-                    CafeAttribute.slug == slug
-                )
-            )
-        )
+    stmt = filter_by_attribute(stmt, amenities, 'amenity')
+    stmt = filter_by_attribute(stmt, payments, 'payment')
+    stmt = filter_by_attribute(stmt, features, 'feature')
 
     return stmt
-
-
-def _get_selected_attributes(category, slugs):
-    if not slugs:
-        return []
-
-    attributes = db.session.execute(
-        db.select(CafeAttribute).where(
-            CafeAttribute.category == category,
-            CafeAttribute.slug.in_(slugs)
-        )
-    ).scalars().all()
-
-    # Preserve the order in which the user selected them.
-    attributes_by_slug = {
-        attribute.slug: attribute
-        for attribute in attributes
-    }
-
-    return [
-        attributes_by_slug[slug]
-        for slug in dict.fromkeys(slugs)
-        if slug in attributes_by_slug
-    ]
 
 
 def _pagination_url(page):
@@ -127,25 +66,9 @@ def home():
         error_out=False
     )
 
-    cafe_ids = [cafe.id for cafe in pagination.items]
-
-    review_stats = {}
-
-    if cafe_ids:
-        results = db.session.execute(
-            db.select(
-                CafeReview.cafe_id,
-                db.func.avg(CafeReview.rating).label("average_rating"),
-                db.func.count(CafeReview.id).label("review_count"),
-            )
-            .where(CafeReview.cafe_id.in_(cafe_ids))
-            .group_by(CafeReview.cafe_id)
-        ).all()
-
-        review_stats = {
-            cafe_id: (average_rating, review_count)
-            for cafe_id, average_rating, review_count in results
-        }
+    review_stats = get_review_stats(
+        [cafe.id for cafe in pagination.items]
+    )
 
     cafes = []
 
@@ -161,42 +84,33 @@ def home():
             "review_count": review_count,
         })
 
-    cafe_amenities = db.session.execute(
-        db.select(CafeAttribute).where(CafeAttribute.category == "amenity")
-    ).scalars().all()
-
-    cafe_features = db.session.execute(
-        db.select(CafeAttribute).where(CafeAttribute.category == "feature")
-    ).scalars().all()
-
-    cafe_payments = db.session.execute(
-        db.select(CafeAttribute).where(CafeAttribute.category == "payment")
-    ).scalars().all()
+    cafe_amenities = CafeAttribute.get_by_category("amenity")
+    cafe_payments = CafeAttribute.get_by_category("payment")
+    cafe_features = CafeAttribute.get_by_category("feature")
 
     feature_options = [
         {
             "name": feature.name,
-            "slug": feature.slug
+            "slug": feature.slug,
         }
         for feature in cafe_features
     ]
 
     filters_applied = request.args.get('filters_applied', False, type=bool)
-
     selected_amenity_slugs = request.args.getlist('amenities')
     selected_payment_slugs = request.args.getlist('payments')
     selected_feature_slugs = request.args.getlist('features')
 
     # Resolve slugs into CafeAttribute instances.
-    selected_amenities = _get_selected_attributes(
+    selected_amenities = get_attributes_from_slugs(
         'amenity', selected_amenity_slugs
     )
 
-    selected_payments = _get_selected_attributes(
+    selected_payments = get_attributes_from_slugs(
         'payment', selected_payment_slugs
     )
 
-    selected_features = _get_selected_attributes(
+    selected_features = get_attributes_from_slugs(
         'feature', selected_feature_slugs
     )
 
