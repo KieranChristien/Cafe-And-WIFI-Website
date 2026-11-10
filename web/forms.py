@@ -19,58 +19,83 @@ URL_MAX_LENGTH = 2048
 IMAGE_MAX_SIZE_MB = 10
 THUMBNAIL_MAX_SIZE_MB = 5
 
+
 # ------------------------------------------------------------------------------------------------------
-# DATA REQUIRED VALIDATION
+# SHARED HELPERS
+# ------------------------------------------------------------------------------------------------------
+def _validate_length_bounds(
+        min_len: int | None,
+        max_len: int | None,
+) -> None:
+    if min_len is not None and min_len < 0:
+        raise ValueError("`min_len` cannot be negative.")
+
+    if max_len is not None and max_len < 0:
+        raise ValueError("`max_len` cannot be negative.")
+
+    if min_len is not None and max_len is not None and max_len < min_len:
+        raise ValueError("`min_len` cannot be more than `max_len`.")
+
+
+# ------------------------------------------------------------------------------------------------------
+# REQUIRED FIELD VALIDATION
 # ------------------------------------------------------------------------------------------------------
 FIELD_REQUIRED = "This field is required."
+RequiredValidatorType = type[DataRequired] | type[InputRequired]
 
 
-def required_validators(message: str | None = None) -> list:
-    if message is None:
-        message = FIELD_REQUIRED
+def _required_message(
+        message: str | None = None,
+) -> str:
+    return FIELD_REQUIRED if message is None else message
 
-    return [InputRequired(message=message)]
+
+def required_validators(
+        validator_type: RequiredValidatorType = InputRequired,
+        message: str | None = None,
+) -> list:
+    return [
+        validator_type(message=_required_message(message))
+    ]
 
 
-def required_render_kw(message: str | None = None) -> dict:
-    if message is None:
-        message = FIELD_REQUIRED
-
+def required_render_kw(
+        message: str | None = None,
+) -> dict:
     return {
-        "required": True,
-        "data-msg-required": message,
+        "data-msg-required": _required_message(message)
     }
 
 
 # ------------------------------------------------------------------------------------------------------
 # STRING VALIDATION
 # ------------------------------------------------------------------------------------------------------
-def string_validators(min_len: int = -1, max_len: int = -1, required: bool = False, required_message: str | None = None) -> list:
-    if min_len > -1 and -1 < max_len < min_len:
-        raise ValueError("`min_len` cannot be more than `max_len`.")
+def string_validators(min_len: int | None = None, max_len: int | None = None, required: bool = False,
+                      required_message: str | None = None) -> list:
+    _validate_length_bounds(min_len, max_len)
 
-    validators: list = required_validators(required_message) if required else [Optional()]
+    validators: list = required_validators(DataRequired, required_message) if required else [Optional()]
 
-    if min_len > -1:
+    if min_len is not None:
         validators.append(Length(min=min_len, message=f"Please use at least {min_len} characters."))
 
-    if max_len > -1:
+    if max_len is not None:
         validators.append(Length(max=max_len, message=f"Please use {max_len} characters or fewer."))
 
     return validators
 
 
-def string_render_kw(min_len: int = -1, max_len: int = -1, required: bool = False, required_message: str | None = None) -> dict:
-    if min_len > -1 and -1 < max_len < min_len:
-        raise ValueError("`min_len` cannot be more than `max_len`.")
+def string_render_kw(min_len: int | None = None, max_len: int | None = None, required: bool = False,
+                     required_message: str | None = None) -> dict:
+    _validate_length_bounds(min_len, max_len)
 
     render_kw: dict = required_render_kw(required_message) if required else {}
 
-    if min_len > -1:
+    if min_len is not None:
         render_kw["minlength"] = min_len
         render_kw["data-msg-too-short"] = f"Please use at least {min_len} characters."
 
-    if max_len > -1:
+    if max_len is not None:
         render_kw["maxlength"] = max_len
         render_kw["data-msg-too-long"] = f"Please use {max_len} characters or fewer."
 
@@ -85,7 +110,7 @@ EMAIL_TOO_LONG = f"Please use {EMAIL_MAX_LENGTH} characters or fewer."
 
 
 def email_validators(required: bool = False, required_message: str | None = None) -> list:
-    validators: list = required_validators(required_message) if required else [Optional()]
+    validators: list = required_validators(DataRequired, required_message) if required else [Optional()]
 
     validators.extend([
         Email(message=EMAIL_INVALID),
@@ -98,6 +123,7 @@ def email_validators(required: bool = False, required_message: str | None = None
 def email_render_kw(required: bool = False, required_message: str | None = None) -> dict:
     render_kw: dict = required_render_kw(required_message) if required else {}
     render_kw.update({
+        "type": "email",
         "maxlength": EMAIL_MAX_LENGTH,
         "data-msg-type-mismatch": EMAIL_INVALID,
         "data-msg-too-long": EMAIL_TOO_LONG,
@@ -134,12 +160,16 @@ FILE_REQUIRED = "This file is required."
 FILE_TOO_LARGE = "File must be {max_size_mb}MB or smaller."
 
 
-def file_validators(max_size_mb: int = -1, is_image: bool = False, required: bool = False, required_message: str | None = None) -> list:
+def file_validators(max_size_mb: int | None = None, is_image: bool = False, required: bool = False,
+                    required_message: str | None = None) -> list:
+    if max_size_mb is not None and max_size_mb < 0:
+        raise ValueError("`max_size_mb` cannot be negative.")
+
     validators: list = [FileRequired(
         message=FILE_REQUIRED if required_message is None else required_message,
     )] if required else [Optional()]
 
-    if max_size_mb > -1:
+    if max_size_mb is not None:
         validators.append(
             FileSize(
                 max_size=max_size_mb * BYTES_PER_MB,
@@ -158,7 +188,11 @@ def file_validators(max_size_mb: int = -1, is_image: bool = False, required: boo
     return validators
 
 
-def file_render_kw(max_size_mb: int = -1, is_image: bool = False, required: bool = False, required_message: str | None = None) -> dict:
+def file_render_kw(max_size_mb: int | None = None, is_image: bool = False, required: bool = False,
+                   required_message: str | None = None) -> dict:
+    if max_size_mb is not None and max_size_mb < 0:
+        raise ValueError("`max_size_mb` cannot be negative.")
+
     render_kw: dict = required_render_kw(
         FILE_REQUIRED if required_message is None else required_message,
     ) if required else {}
@@ -169,7 +203,7 @@ def file_render_kw(max_size_mb: int = -1, is_image: bool = False, required: bool
         )
         render_kw["data-msg-invalid-file"] = IMAGE_INVALID
 
-    if max_size_mb > -1:
+    if max_size_mb is not None:
         render_kw["data-max-size-bytes"] = max_size_mb * BYTES_PER_MB
         render_kw["data-msg-file-too-large"] = FILE_TOO_LARGE.format(
             max_size_mb=max_size_mb
@@ -186,7 +220,7 @@ URL_TOO_LONG = f"Please use {URL_MAX_LENGTH} characters or fewer."
 
 
 def url_validators(required: bool = False, required_message: str | None = None) -> list:
-    validators: list = required_validators(required_message) if required else [Optional()]
+    validators: list = required_validators(DataRequired, required_message) if required else [Optional()]
 
     validators.extend([
         URL(message=URL_INVALID),
@@ -200,6 +234,7 @@ def url_render_kw(required: bool = False, required_message: str | None = None) -
     render_kw: dict = required_render_kw(required_message) if required else {}
 
     render_kw.update({
+        "type": "url",
         "maxlength": URL_MAX_LENGTH,
         "data-msg-type-mismatch": URL_INVALID,
         "data-msg-too-long": URL_TOO_LONG,
@@ -220,12 +255,15 @@ class CafeReviewForm(FlaskForm):
         "Rating",
         default=5,
         validators=[
-            InputRequired(),
+            *required_validators(
+                InputRequired,
+                "Please rate the café."
+            ),
             NumberRange(min=1, max=5),
         ],
         render_kw={
+            **required_render_kw("Please rate the café."),
             "type": "range",
-            "required": True,
             "min": 1,
             "max": 5,
             "step": 1,
