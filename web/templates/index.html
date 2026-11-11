@@ -187,7 +187,7 @@
                                         <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
                                         <path d="m8 1.5 1.9 4 4.35.6-3.15 3.05.76 4.35L8 11.45 4.14 13.5l.76-4.35L1.75 6.1 6.1 5.5z"/>
                                         </svg>
-                                        {{ item.average_rating }}
+                                        {{ item.average_rating|round(1) if item.average_rating is not none else "-" }}
                                     </span>
                                     <span>
                                         ({{ item.review_count }})
