@@ -35,7 +35,16 @@
                 <div class="drawer-body mb-3 lg:mb-0">
                     <ul class="nav navbar-nav me-auto">
                         <li class="nav-item"><a class="nav-link" href="#results">Browse</a></li>
-                        <li class="nav-item"><a class="nav-link" href="#guides">Guides</a></li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('listing.example') }}">
+                                Example listing
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#guides">
+                            Guides
+                            </a>
+                        </li>
                     </ul>
                 </div>
             </dialog>
