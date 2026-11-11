@@ -1,9 +1,47 @@
 from flask import Blueprint, jsonify, render_template, request, url_for
+from typing import Literal, cast
 
 from web.extensions import db
-from web.models import Cafe, CafeAttribute, filter_by_attribute, get_attributes_from_slugs, get_review_stats
+from web.models import (Cafe, CafeAttribute, filter_by_attribute, get_attributes_from_slugs,
+                        get_review_stats, join_review_stats)
 
 main = Blueprint('main', __name__)
+
+SortTypes = Literal[
+    "top-rated",
+    "most-reviewed",
+    "recently-added"
+]
+
+SORT_LABELS = {
+    "top-rated": "Top rated",
+    "most-reviewed": "Most reviewed",
+    "recently-added": "Recently added",
+}
+
+
+def _apply_sort(stmt, sort_by: SortTypes):
+    stmt = stmt.order_by(None)
+
+    if sort_by == "recently-added":
+        return stmt.order_by(Cafe.id.desc())
+
+    stmt, average_rating, review_count = join_review_stats(stmt)
+
+    if sort_by == "top-rated":
+        return stmt.order_by(
+            average_rating.desc(),
+            review_count.desc(),
+            Cafe.id.asc(),
+        )
+    elif sort_by == "most-reviewed":
+        return stmt.order_by(
+            review_count.desc(),
+            average_rating.desc(),
+            Cafe.id.asc(),
+        )
+    else:
+        return stmt.order_by(Cafe.id.asc())
 
 
 def _get_filtered_cafes():
@@ -18,7 +56,22 @@ def _get_filtered_cafes():
     stmt = filter_by_attribute(stmt, payments, 'payment')
     stmt = filter_by_attribute(stmt, features, 'feature')
 
+    rating = request.args.get('rating', -1, type=float)
+
+    if rating >= 0:
+        stmt, average_rating, _ = join_review_stats(stmt)
+        stmt = stmt.where(average_rating >= rating)
+
     return stmt
+
+
+def _get_sort_by() -> SortTypes:
+    value = request.args.get("sort_by", "top-rated")
+
+    if value not in SORT_LABELS:
+        return "top-rated"
+
+    return cast(SortTypes, value)
 
 
 def _pagination_url(page):
@@ -51,13 +104,27 @@ def _remove_filter_url(param, value=None):
     return url_for('main.home', **args)
 
 
+def _sort_by_url(sort_by: SortTypes | None = None):
+    args = request.args.to_dict(flat=False)
+
+    args['sort_by'] = [sort_by or 'top-rated']
+
+    # Return to the first page after changing filters.
+    args.pop('page', None)
+
+    return url_for('main.home', **args)
+
+
 @main.route('/')
 def home():
     page = request.args.get('page', 1, type=int)
     per_page = 4
 
+    sort_by = _get_sort_by()
+
     # Retrieve and paginate cafés.
-    stmt = _get_filtered_cafes().order_by(Cafe.id.asc())
+    stmt = _get_filtered_cafes()
+    stmt = _apply_sort(stmt, sort_by)
 
     pagination = db.paginate(
         stmt,
@@ -135,11 +202,14 @@ def home():
         pagination=pagination,
         pagination_url=_pagination_url,
         remove_filter_url=_remove_filter_url,
+        sort_by_url=_sort_by_url,
+        sort_by=sort_by,
+        sort_label=SORT_LABELS[sort_by],
         cafe_amenities=cafe_amenities,
         cafe_features=cafe_features,
         cafe_payments=cafe_payments,
         feature_options=feature_options,
-        filters=filters
+        filters=filters,
     )
 
 

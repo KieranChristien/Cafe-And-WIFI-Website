@@ -319,3 +319,34 @@ def get_review_stats(cafe_ids: list[int]) -> dict[int, tuple[float | None, int]]
         }
 
     return review_stats
+
+def get_review_stats_subquery():
+    return (
+        db.select(
+            CafeReview.cafe_id.label("cafe_id"),
+            db.func.avg(CafeReview.rating).label("average_rating"),
+            db.func.count(CafeReview.id).label("review_count"),
+        )
+        .group_by(CafeReview.cafe_id)
+        .subquery()
+    )
+
+def join_review_stats(stmt):
+    review_stats = get_review_stats_subquery()
+
+    stmt = stmt.outerjoin(
+        review_stats,
+        Cafe.id == review_stats.c.cafe_id,
+    )
+
+    average_rating = db.func.coalesce(
+        review_stats.c.average_rating,
+        0,
+    )
+
+    review_count = db.func.coalesce(
+        review_stats.c.review_count,
+        0,
+    )
+
+    return stmt, average_rating, review_count

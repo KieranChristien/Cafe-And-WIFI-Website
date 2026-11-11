@@ -83,13 +83,14 @@
                     </button>
 
                     <button class="btn-outline theme-secondary btn-sm" type="button" data-bs-toggle="menu"
-                            aria-expanded="false">Top rated
+                            aria-expanded="false">
+                        {{ sort_label }}
                     </button>
                     <div class="menu">
-                        <a class="menu-item" href="#results">Top rated</a>
-                        <a class="menu-item" href="#results">Most reviewed</a>
-                        <a class="menu-item" href="#results">Nearest</a>
-                        <a class="menu-item" href="#results">Recently added</a>
+                        <a class="menu-item" href="{{ sort_by_url('top-rated') }}#results">Top rated</a>
+                        <a class="menu-item" href="{{ sort_by_url('most-reviewed') }}#results">Most reviewed</a>
+                        <a class="menu-item" href="{{ sort_by_url('nearest') }}#results">Nearest</a>
+                        <a class="menu-item" href="{{ sort_by_url('recently-added') }}#results">Recently added</a>
                     </div>
                 </div>
 
@@ -367,7 +368,11 @@
     </div>
 
     <div class="drawer-body">
-        <form method="GET" action="{{ url_for('main.home', _anchor='results') }}">
+        <form
+                method="GET"
+                action="{{ url_for('main.home', _anchor='results') }}"
+                data-count-url="{{ url_for('main.cafe_count') }}"
+        >
             <input type="hidden" name="filters_applied" value="1">
 
             <div class="filter-drawer-group">
@@ -381,7 +386,7 @@
                             min="1"
                             max="5"
                             step="0.5"
-                            value="{{ filters.rating if filters_applied else '4' }}"
+                            value="{{ filters.rating if filters.applied else '4' }}"
                             aria-label="Minimum rating">
                 </div>
                 <p class="fs-xs fg-3 mb-0"><strong class="fg-1" id="ratingOut">4.0</strong> stars and up</p>
@@ -444,7 +449,8 @@
                                 aria-expanded="false"
                         >
 
-                        <div class="chip-suggestions" id="featureSuggestions" role="listbox" aria-label="Feature suggestions" hidden></div>
+                        <div class="chip-suggestions" id="featureSuggestions" role="listbox"
+                             aria-label="Feature suggestions" hidden></div>
                         <div class="visually-hidden" id="featureInputStatus" aria-live="polite"></div>
                         <div data-chip-values></div>
                     </div>
@@ -536,10 +542,98 @@
                 {% endfor %}
             </div>
 
-            <button class="btn-solid theme-primary w-100 mt-6" type="submit" data-bs-dismiss="drawer">
-                Show 86 places
+            <input
+                    type="hidden"
+                    name="sort_by"
+                    value="{{ sort_by }}"
+            >
+
+            <button
+                    class="btn-solid theme-primary w-100 mt-6"
+                    type="submit"
+                    id="filterSubmitButton"
+                    data-bs-dismiss="drawer"
+            >
+                Show {{ pagination.total }}
+                {{ 'place' if pagination.total == 1 else 'places' }}
             </button>
         </form>
     </div>
 </dialog>
+
+<script>
+    (() => {
+        const form = document.querySelector('#filterDrawer form');
+
+        if (!form) return;
+
+        const submitButton = form.querySelector('#filterSubmitButton');
+
+        let debounceTimer;
+        let controller;
+
+        function updateFilterCount() {
+            // Cancel any pending update or previous request.
+            clearTimeout(debounceTimer);
+            controller?.abort();
+
+            // Debounce requests while the user changes multiple filters.
+            debounceTimer = setTimeout(async () => {
+                const params = new URLSearchParams(new FormData(form));
+
+                const url = new URL(
+                    form.dataset.countUrl,
+                    window.location.origin
+                );
+
+                url.search = params.toString();
+
+                controller = new AbortController();
+
+                try {
+                    const response = await fetch(url, {
+                        headers: {
+                            'Accept': 'application/json'
+                        },
+                        signal: controller.signal
+                    });
+
+                    if (!response.ok) {
+                        throw new Error('Failed to retrieve filter count');
+                    }
+
+                    const data = await response.json();
+                    const count = Number(data.count);
+
+                    submitButton.textContent =
+                        `Show ${count.toLocaleString()} ${
+                            count === 1 ? 'place' : 'places'
+                        }`;
+
+                } catch (error) {
+                    if (error.name !== 'AbortError') {
+                        console.error(error);
+                    }
+                }
+            }, 200);
+        }
+
+        // Update when form controls change.
+        form.addEventListener('input', updateFilterCount);
+        form.addEventListener('change', updateFilterCount);
+
+        // Also detect dynamically added/removed feature chips.
+        const chipValues = form.querySelector('[data-chip-values]');
+
+        if (chipValues) {
+            const observer = new MutationObserver(updateFilterCount);
+
+            observer.observe(chipValues, {
+                childList: true,
+                subtree: true,
+                attributes: true
+            });
+        }
+    })();
+</script>
 {% endblock %}
