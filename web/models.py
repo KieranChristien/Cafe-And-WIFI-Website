@@ -1,7 +1,7 @@
-from typing import Literal, Optional
-
-from sqlalchemy import CheckConstraint, ForeignKey, Integer, String, select, func, Select
+from decimal import Decimal
+from sqlalchemy import CheckConstraint, ForeignKey, Integer, Numeric, Select, String, func, select
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from typing import Literal, Optional
 
 from web.extensions import db
 
@@ -27,13 +27,107 @@ cafe_attributes = db.Table(
 class Cafe(db.Model):
     __tablename__ = "cafe"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    name: Mapped[str] = mapped_column(String(250), nullable=False)
-    map_url: Mapped[str] = mapped_column(String(500), nullable=False)
-    img_url: Mapped[str] = mapped_column(String(500), nullable=False)
-    location: Mapped[str] = mapped_column(String(250), nullable=False)
-    seats: Mapped[str] = mapped_column(String(250), nullable=False)
-    coffee_price: Mapped[str | None] = mapped_column(String(250), nullable=True)
+    __table_args__ = (
+        CheckConstraint(
+            "latitude IS NULL OR latitude BETWEEN -90 AND 90",
+            name="ck_cafe_latitude",
+        ),
+        CheckConstraint(
+            "longitude IS NULL OR longitude BETWEEN -180 AND 180",
+            name="ck_cafe_longitude",
+        ),
+        CheckConstraint(
+            """
+            (latitude IS NULL AND longitude IS NULL)
+            OR
+            (latitude IS NOT NULL AND longitude IS NOT NULL)
+            """,
+            name="ck_cafe_coordinates_both_or_none",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(
+        Integer,
+        primary_key=True
+    )
+
+    name: Mapped[str] = mapped_column(
+        String(250),
+        nullable=False
+    )
+
+    phone_number: Mapped[str | None] = mapped_column(
+        String(32),
+        nullable=True,
+    )
+
+    img_url: Mapped[str] = mapped_column(
+        String(500),
+        nullable=False
+    )
+
+    # Address
+    location: Mapped[str] = mapped_column(
+        String(250),
+        nullable=False
+    )
+
+    address_line_1: Mapped[str | None] = mapped_column(
+        String(250),
+        nullable=True,
+    )
+
+    address_line_2: Mapped[str | None] = mapped_column(
+        String(250),
+        nullable=True,
+    )
+
+    postal_code: Mapped[str | None] = mapped_column(
+        String(20),
+        nullable=True,
+    )
+
+    city: Mapped[str | None] = mapped_column(
+        String(250),
+        nullable=True
+    )
+
+    country: Mapped[str | None] = mapped_column(
+        String(100),
+        nullable=True,
+    )
+
+    # Geographic coordinates
+    latitude: Mapped[Decimal | None] = mapped_column(
+        Numeric(10, 7),
+        nullable=True,
+    )
+
+    longitude: Mapped[Decimal | None] = mapped_column(
+        Numeric(10, 7),
+        nullable=True,
+    )
+
+    # Geocoding source information
+    location_provider: Mapped[str | None] = mapped_column(
+        String(50),
+        nullable=True,
+    )
+
+    location_provider_id: Mapped[str | None] = mapped_column(
+        String(255),
+        nullable=True,
+    )
+
+    seats: Mapped[str] = mapped_column(
+        String(250),
+        nullable=False
+    )
+
+    coffee_price: Mapped[str | None] = mapped_column(
+        String(250),
+        nullable=True
+    )
 
     # Many-to-many relationship with CafeAttribute
     attributes: Mapped[list["CafeAttribute"]] = relationship(
@@ -320,6 +414,7 @@ def get_review_stats(cafe_ids: list[int]) -> dict[int, tuple[float | None, int]]
 
     return review_stats
 
+
 def get_review_stats_subquery():
     return (
         db.select(
@@ -330,6 +425,7 @@ def get_review_stats_subquery():
         .group_by(CafeReview.cafe_id)
         .subquery()
     )
+
 
 def join_review_stats(stmt):
     review_stats = get_review_stats_subquery()

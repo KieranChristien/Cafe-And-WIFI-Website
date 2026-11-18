@@ -3,7 +3,8 @@
  */
 
 import {Chips, Datepicker} from 'bootstrap'
-import {initBase, onReady} from './base.js'
+import {initBase, initYear, onReady} from './base.js'
+import {initFormValidation} from './form-validation.js'
 
 // Fix Bootstrap's datepicker inside native <dialog> elements.
 const initDatepickerDialogFix = () => {
@@ -738,10 +739,12 @@ const initShareButton = () => {
 
 onReady(() => {
     initBase()
+    initFormValidation()
     initFeaturePicker()
 
     bindRange('ratingRange', 'ratingOut', (v) => Number(v).toFixed(1))
     initMapSync()
     initOpenDatepicker()
     initShareButton()
+    initYear()
 })

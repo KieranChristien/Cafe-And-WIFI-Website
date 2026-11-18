@@ -1,0 +1,11 @@
+{% macro invalid_feedback(field, input_id=none) %}
+    {% set feedback_id = (input_id or field.id) ~ '-feedback' %}
+
+    <div
+        class="invalid-feedback{% if field.errors %} d-block{% endif %}"
+        id="{{ feedback_id }}"
+        aria-live="polite"
+    >
+        {{ field.errors[0] if field.errors else '' }}
+    </div>
+{% endmacro %}

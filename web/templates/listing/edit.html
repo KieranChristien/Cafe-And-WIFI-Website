@@ -1,0 +1,376 @@
+{% extends "base.html" %}
+{% from "macros/forms.html" import invalid_feedback %}
+
+{% block content %}
+<main id="main" class="section">
+    <form
+            id="editForm"
+            method="POST"
+            action="{{ url_for('listing.edit', cafe_id=cafe.id) }}"
+            data-bs-validate
+            novalidate
+    >
+        {{ form.hidden_tag() }}
+
+        <div class="container">
+
+            <nav aria-label="breadcrumb" class="mb-6">
+                <ol class="breadcrumb fs-sm">
+                    <li class="breadcrumb-item"><a class="breadcrumb-link" href="{{ url_for('main.home') }}">Home</a>
+                    </li>
+                    <li class="breadcrumb-divider">/</li>
+                    <li class="breadcrumb-item"><a class="breadcrumb-link"
+                                                   href="{{ url_for('main.home') }}#results">Coffee</a></li>
+                    <li class="breadcrumb-divider">/</li>
+                    <li class="breadcrumb-item" aria-current="page"><a class="breadcrumb-link active" href="view.html">{{
+                        cafe.name }}</a></li>
+                </ol>
+            </nav>
+
+            <div class="ph ph-16x9 detail-hero fs-2xl mb-7" style="max-height:380px">
+                <img
+                        src="{{ cafe.img_url }}"
+                        alt="{{ cafe.name }}"
+                        loading="lazy"
+                >
+            </div>
+
+            <div class="row g-7">
+                <div class="lg:col-8">
+
+                    <div class="d-flex flex-wrap align-items-start gap-4 mb-5">
+                        <div class="me-auto">
+                            <h1 class="fs-4xl fw-bold mb-3" style="letter-spacing:-.03em">
+                                {{ cafe.name }}
+                            </h1>
+                            <div class="listing-meta">
+                                <span class="rating">
+                                    <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                                        <path d="m8 1.5 1.9 4 4.35.6-3.15 3.05.76 4.35L8 11.45 4.14 13.5l.76-4.35L1.75 6.1 6.1 5.5z"/>
+                                    </svg>
+                                    {{ cafe.average_rating|round(1) if cafe.average_rating is not none else "-" }}
+                                </span>
+                                {% set review_count = cafe.reviews|length %}
+                                <span>
+                                    ({{ review_count }} {{ 'review' if review_count == 1 else 'reviews' }})
+                                </span>
+                                <span aria-hidden="true">
+                                    &#183;
+                                </span>
+                                <span>
+                                    {{ cafe.location }}
+                                </span>
+                                <span aria-hidden="true">
+                                    &#183;
+                                </span>
+                                <span>
+                                    &#8364;&#8364;
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex flex-wrap gap-3 mb-7">
+                        {% for chip in cafe.attributes %}
+                        <span class="chip">
+                            {{ chip.name }}
+                        </span>
+                        {% endfor %}
+                    </div>
+
+                    <ul class="nav nav-tabs mb-5" id="listingTab" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="ov-tab" data-bs-toggle="tab" data-bs-target="#ov"
+                                    type="button" role="tab" aria-controls="ov" aria-selected="true">Overview
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="rv-tab" data-bs-toggle="tab" data-bs-target="#rv" type="button"
+                                    role="tab" aria-controls="rv" aria-selected="false">Reviews
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="ph-tab" data-bs-toggle="tab" data-bs-target="#phts"
+                                    type="button"
+                                    role="tab" aria-controls="phts" aria-selected="false">Photos
+                            </button>
+                        </li>
+                    </ul>
+
+                    <div class="tab-content">
+                        <div class="tab-pane fade show active" id="ov" role="tabpanel" aria-labelledby="ov-tab"
+                             tabindex="0">
+                            <div class="prose" style="max-width:44rem">
+                                <p>Three seats, one grinder and a roaster in the back that has been running since 2011.
+                                    Kasper roasts on Mondays, which is the day to come if you want to talk about it, and
+                                    the
+                                    day to avoid if you want somewhere quiet.</p>
+                                <p>The filter menu changes weekly and is written on a card by the till. There is no oat
+                                    milk
+                                    debate here — they have it, they will not comment on it.</p>
+                                <h3>Good to know</h3>
+                                <ul>
+                                    <li>Cash only, there is an ATM two doors down</li>
+                                    <li>No laptops after 11:00 on weekends</li>
+                                    <li>Bags of the current roast are &#8364;14</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="tab-pane fade" id="rv" role="tabpanel" aria-labelledby="rv-tab" tabindex="0">
+                            <div class="vstack gap-5" style="max-width:44rem">
+                                {% for review in cafe.reviews %}
+                                <figure class="surface surface-pad mb-0">
+                                    <div class="stars mb-4" role="img" aria-label="{{ review.rating }} out of 5">
+                                        {% for _ in range(review.rating) %}
+                                        <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                                            <path d="m8 1.5 1.9 4 4.35.6-3.15 3.05.76 4.35L8 11.45 4.14 13.5l.76-4.35L1.75 6.1 6.1 5.5z"/>
+                                        </svg>
+                                        {% endfor %}
+                                    </div>
+                                    <blockquote class="mb-4">
+                                        "{{ review.body }}"
+                                    </blockquote>
+                                    <figcaption class="d-flex align-items-center gap-4">
+                                    <span class="avatar">
+                                        <span class="avatar-initials">
+                                            {% set names = review.name.split() %}
+
+                                            {% if names %}
+                                                {% set initials = names[0][0] ~ (names[-1][0] if names|length > 1 else names[0][1:2]) %}
+                                                {{ initials|upper }}
+                                            {% else %}
+                                                ?
+                                            {% endif %}
+                                        </span>
+                                    </span>
+                                        <span>
+                                        <span class="d-block fw-semibold fs-sm">
+                                           {% if names %}
+                                                {% set name = names[0] ~ " " ~ (names[-1][0] if names|length > 1 else names[0]) ~ "." %}
+                                                {{ name|title }}
+                                            {% else %}
+                                                ?
+                                            {% endif %}
+                                        </span>
+                                        <span class="d-block fg-3 fs-xs">
+                                            42 reviews
+                                        </span>
+                                    </span>
+                                    </figcaption>
+                                </figure>
+                                {% else %}
+                                <p class="fg-2">
+                                    No reviews yet. Be the first to leave one!
+                                </p>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        <div class="tab-pane fade" id="phts" role="tabpanel" aria-labelledby="ph-tab" tabindex="0">
+                            <div class="row g-4" style="max-width:44rem">
+                                <div class="col-6 md:col-4">
+                                    <div class="ph ph-1x1 rounded-5">Bar</div>
+                                </div>
+                                <div class="col-6 md:col-4">
+                                    <div class="ph ph-1x1 rounded-5">Roaster</div>
+                                </div>
+                                <div class="col-6 md:col-4">
+                                    <div class="ph ph-1x1 rounded-5">Filter</div>
+                                </div>
+                                <div class="col-6 md:col-4">
+                                    <div class="ph ph-1x1 rounded-5">Terrace</div>
+                                </div>
+                                <div class="col-6 md:col-4">
+                                    <div class="ph ph-1x1 rounded-5">Beans</div>
+                                </div>
+                                <div class="col-6 md:col-4">
+                                    <div class="ph ph-1x1 rounded-5">Street</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <aside class="lg:col-4">
+                    <div class="surface surface-pad" style="position:sticky;top:5.5rem">
+                        <div class="map-canvas rounded-5 mb-5" style="aspect-ratio:4/3">
+                            <span class="map-pin is-active" style="left:50%;top:50%">
+                                1
+                            </span>
+                        </div>
+
+                        <div class="form-field mb-4">
+                            {{ form.phone_number.label(class="form-label", for="cPhoneNumber") }}
+
+                            {{ form.phone_number(class="fg-2 fs-sm mb-5 form-control", id="cPhoneNumber") }}
+
+                            {{ invalid_feedback(form.phone_number, "cPhoneNumber") }}
+                        </div>
+
+                        <div class="form-field mb-4">
+                            {{ form.address_line_1.label(class="form-label", for="cAddressLine1") }}
+
+                            {{ form.address_line_1(class="fg-2 fs-sm mb-5 form-control", id="cAddressLine1") }}
+
+                            {{ invalid_feedback(form.address_line_1, "cAddressLine1") }}
+                        </div>
+
+                        <div class="form-field mb-4">
+                            {{ form.address_line_2.label(class="form-label", for="cAddressLine2") }}
+
+                            {{ form.address_line_2(class="fg-2 fs-sm mb-5 form-control", id="cAddressLine2") }}
+
+                            {{ invalid_feedback(form.address_line_2, "cAddressLine2") }}
+                        </div>
+
+                        <div class="form-field mb-4">
+                            {{ form.location.label(class="form-label", for="cLocation") }}
+
+                            {{ form.location(class="fg-2 fs-sm mb-5 form-control", id="cLocation") }}
+
+                            {{ invalid_feedback(form.location, "cLocation") }}
+                        </div>
+
+                        <div class="form-field mb-4">
+                            {{ form.region.label(class="form-label", for="cRegion") }}
+
+                            {{ form.region(class="fg-2 fs-sm mb-5 form-control", id="cRegion") }}
+
+                            {{ invalid_feedback(form.region, "cRegion") }}
+                        </div>
+
+                        <div class="form-field mb-4">
+                            {{ form.postal_code.label(class="form-label", for="cPostalCode") }}
+
+                            {{ form.postal_code(class="fg-2 fs-sm mb-5 form-control", id="cPostalCode") }}
+
+                            {{ invalid_feedback(form.postal_code, "cPostalCode") }}
+                        </div>
+
+                        <div class="form-field mb-4">
+                            {{ form.country_code.label(class="form-label", for="cCountryCode") }}
+
+                            {{ form.country_code(class="fg-2 fs-sm mb-5 form-control", id="cCountryCode") }}
+
+                            {{ invalid_feedback(form.country_code, "cCountryCode") }}
+                        </div>
+
+                        <h2 class="fs-sm fw-semibold mb-3">Opening hours</h2>
+                        <div class="mb-5">
+                            <div class="hours-row is-today">
+                                <span>
+                                    Monday
+                                </span>
+                                <span>
+                                    08:00 &#8211; 18:00
+                                </span>
+                            </div>
+                            <div class="hours-row">
+                                <span>
+                                    Tuesday
+                                </span>
+                                <span>
+                                    08:00 &#8211; 18:00
+                                </span>
+                            </div>
+                            <div class="hours-row">
+                                <span>
+                                    Wednesday
+                                </span>
+                                <span>
+                                    08:00 &#8211; 18:00
+                                </span>
+                            </div>
+                            <div class="hours-row">
+                                <span>
+                                    Thursday
+                                </span>
+                                <span>
+                                    08:00 &#8211; 18:00
+                                </span>
+                            </div>
+                            <div class="hours-row">
+                                <span>
+                                    Friday
+                                </span>
+                                <span>
+                                    08:00 &#8211; 19:00
+                                </span>
+                            </div>
+                            <div class="hours-row">
+                                <span>
+                                    Saturday
+                                </span>
+                                <span>
+                                    09:00 &#8211; 19:00
+                                </span>
+                            </div>
+                            <div class="hours-row">
+                                <span>
+                                    Sunday
+                                </span>
+                                <span class="fg-3">
+                                    Closed
+                                </span>
+                            </div>
+                        </div>
+
+                        {{ form.submit(class="btn-solid theme-primary w-100") }}
+                    </div>
+                </aside>
+            </div>
+
+            <section class="mt-12">
+                <h2 class="fs-2xl fw-bold mb-6">Nearby</h2>
+                <div class="row g-5">
+                    <div class="md:col-4">
+                        <article class="listing surface lift">
+                            <div class="listing-media">
+                                <div class="ph ph-16x9">Papier</div>
+                            </div>
+                            <div class="listing-body"><h3 class="listing-title"><a href="view.html">Papier Bookshop</a>
+                            </h3>
+                                <div class="listing-meta"><span class="rating"><svg viewBox="0 0 16 16"
+                                                                                    fill="currentColor"
+                                                                                    aria-hidden="true"><path
+                                        d="m8 1.5 1.9 4 4.35.6-3.15 3.05.76 4.35L8 11.45 4.14 13.5l.76-4.35L1.75 6.1 6.1 5.5z"/></svg>4.7</span><span
+                                        aria-hidden="true">&#183;</span><span>250 m</span></div>
+                            </div>
+                        </article>
+                    </div>
+                    <div class="md:col-4">
+                        <article class="listing surface lift">
+                            <div class="listing-media">
+                                <div class="ph ph-16x9">Wielen</div>
+                            </div>
+                            <div class="listing-body"><h3 class="listing-title"><a href="view.html">Wielen Bike
+                                Repair</a></h3>
+                                <div class="listing-meta"><span class="rating"><svg viewBox="0 0 16 16"
+                                                                                    fill="currentColor"
+                                                                                    aria-hidden="true"><path
+                                        d="m8 1.5 1.9 4 4.35.6-3.15 3.05.76 4.35L8 11.45 4.14 13.5l.76-4.35L1.75 6.1 6.1 5.5z"/></svg>4.9</span><span
+                                        aria-hidden="true">&#183;</span><span>600 m</span></div>
+                            </div>
+                        </article>
+                    </div>
+                    <div class="md:col-4">
+                        <article class="listing surface lift">
+                            <div class="listing-media">
+                                <div class="ph ph-16x9">De Vier Tafels</div>
+                            </div>
+                            <div class="listing-body"><h3 class="listing-title"><a href="view.html">De Vier Tafels</a>
+                            </h3>
+                                <div class="listing-meta"><span class="rating"><svg viewBox="0 0 16 16"
+                                                                                    fill="currentColor"
+                                                                                    aria-hidden="true"><path
+                                        d="m8 1.5 1.9 4 4.35.6-3.15 3.05.76 4.35L8 11.45 4.14 13.5l.76-4.35L1.75 6.1 6.1 5.5z"/></svg>4.6</span><span
+                                        aria-hidden="true">&#183;</span><span>800 m</span></div>
+                            </div>
+                        </article>
+                    </div>
+                </div>
+            </section>
+
+        </div>
+    </form>
+</main>
+{% endblock %}

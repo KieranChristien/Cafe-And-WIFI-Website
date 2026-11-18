@@ -1,29 +1,139 @@
+import phonenumbers
+import pycountry
+import re
+
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileAllowed, FileSize, FileRequired
-from wtforms import IntegerField
+from phonenumbers import NumberParseException
+from typing import Literal, NewType, Sequence
+from wtforms import IntegerField, SelectField
 from wtforms.fields.simple import StringField, TextAreaField, SubmitField
-from wtforms.validators import DataRequired, Length, NumberRange, URL, Optional, Email, InputRequired
+from wtforms.validators import DataRequired, Email, InputRequired, Length, NumberRange, Optional, URL, ValidationError, \
+    Regexp
 
 # ------------------------------------------------------------------------------------------------------
 # Field Lengths
 # ------------------------------------------------------------------------------------------------------
-NAME_MAX_LENGTH = 100
+PHONE_MAX_LENGTH = 32
 EMAIL_MAX_LENGTH = 254
 PASSWORD_MIN_LENGTH = 8
 PASSWORD_MAX_LENGTH = 256
-CAPTION_MAX_LENGTH = 250
-ALT_TEXT_MAX_LENGTH = 150
-URL_NAME_MAX_LENGTH = 20
 URL_MAX_LENGTH = 2048
 
-IMAGE_MAX_SIZE_MB = 10
-THUMBNAIL_MAX_SIZE_MB = 5
+# ------------------------------------------------------------------------------------------------------
+# Auto-Complete
+# ------------------------------------------------------------------------------------------------------
+AutoCompleteToken = Literal[
+    # Name
+    "name",
+    "honorific-prefix",
+    "given-name",
+    "additional-name",
+    "family-name",
+    "honorific-suffix",
+    "nickname",
+
+        # Account
+    "username",
+    "new-password",
+    "current-password",
+    "one-time-code",
+
+        # Organisation
+    "organization-title",
+    "organization",
+
+        # Contact
+    "email",
+    "impp",
+
+        # Phone
+    "tel",
+    "tel-country-code",
+    "tel-national",
+    "tel-area-code",
+    "tel-local",
+    "tel-local-prefix",
+    "tel-local-suffix",
+    "tel-extension",
+
+        # Address
+    "street-address",
+    "address-line1",
+    "address-line2",
+    "address-line3",
+    "address-level4",
+    "address-level3",
+    "address-level2",
+    "address-level1",
+    "postal-code",
+    "country",
+    "country-name",
+
+        # Credit card
+    "cc-name",
+    "cc-given-name",
+    "cc-additional-name",
+    "cc-family-name",
+    "cc-number",
+    "cc-exp",
+    "cc-exp-month",
+    "cc-exp-year",
+    "cc-csc",
+    "cc-type",
+
+        # Transactions
+    "transaction-currency",
+    "transaction-amount",
+
+        # Other
+    "language",
+    "bday",
+    "bday-day",
+    "bday-month",
+    "bday-year",
+    "sex",
+    "url",
+    "photo",
+
+        # Web authentication
+    "webauthn",
+
+        # Grouping
+    "shipping",
+    "billing",
+
+        # Contact types
+    "home",
+    "work",
+    "mobile",
+    "fax",
+    "pager",
+]
+
+SectionToken = NewType("SectionToken", str)
+
+AutocompletePart = AutoCompleteToken | SectionToken
 
 
 # ------------------------------------------------------------------------------------------------------
 # SHARED HELPERS
 # ------------------------------------------------------------------------------------------------------
-def _validate_length_bounds(
+def section_token(name: str) -> SectionToken:
+    if not re.fullmatch(r"[a-zA-Z0-9]+", name):
+        raise ValueError(
+            "Section names must contain only letters and numbers."
+        )
+
+    return SectionToken(f"section-{name}")
+
+
+def strip_string(value):
+    """Remove leading and trailing whitespace from string fields."""
+    return value.strip() if isinstance(value, str) else value
+
+
+def validate_length_bounds(
         min_len: int | None,
         max_len: int | None,
 ) -> None:
@@ -63,16 +173,21 @@ def required_render_kw(
         message: str | None = None,
 ) -> dict:
     return {
-        "data-msg-required": _required_message(message)
+        "required": True,
+        "data-msg-required": _required_message(message),
     }
 
 
 # ------------------------------------------------------------------------------------------------------
 # STRING VALIDATION
 # ------------------------------------------------------------------------------------------------------
-def string_validators(min_len: int | None = None, max_len: int | None = None, required: bool = False,
-                      required_message: str | None = None) -> list:
-    _validate_length_bounds(min_len, max_len)
+def string_validators(
+        min_len: int | None = None,
+        max_len: int | None = None,
+        required: bool = False,
+        required_message: str | None = None
+) -> list:
+    validate_length_bounds(min_len, max_len)
 
     validators: list = required_validators(DataRequired, required_message) if required else [Optional()]
 
@@ -85,9 +200,14 @@ def string_validators(min_len: int | None = None, max_len: int | None = None, re
     return validators
 
 
-def string_render_kw(min_len: int | None = None, max_len: int | None = None, required: bool = False,
-                     required_message: str | None = None) -> dict:
-    _validate_length_bounds(min_len, max_len)
+def string_render_kw(
+        min_len: int | None = None,
+        max_len: int | None = None,
+        required: bool = False,
+        required_message: str | None = None,
+        autocomplete: Sequence[AutocompletePart] | Literal["on", "off"] | None = None,
+) -> dict:
+    validate_length_bounds(min_len, max_len)
 
     render_kw: dict = required_render_kw(required_message) if required else {}
 
@@ -98,6 +218,168 @@ def string_render_kw(min_len: int | None = None, max_len: int | None = None, req
     if max_len is not None:
         render_kw["maxlength"] = max_len
         render_kw["data-msg-too-long"] = f"Please use {max_len} characters or fewer."
+
+    if autocomplete is not None:
+        render_kw["autocomplete"] = (
+            autocomplete
+            if isinstance(autocomplete, str)
+            else " ".join(map(str, autocomplete))
+        )
+
+    return render_kw
+
+# ------------------------------------------------------------------------------------------------------
+# RANGE VALIDATION
+# ------------------------------------------------------------------------------------------------------
+RATING_RANGE_INVALID = "Please choose a rating between 1 and 5."
+
+def range_validators(
+        min_value: int | None = None,
+        max_value: int | None = None,
+        required: bool = False,
+        required_message: str | None = None
+) -> list:
+    validate_length_bounds(min_value, max_value)
+
+    validators: list = required_validators(InputRequired, required_message) if required else [Optional()]
+
+    if min_value is not None:
+        validators.append(NumberRange(min=min_value, message=f"Please use at least {min_value} characters."))
+
+    if max_value is not None:
+        validators.append(NumberRange(max=max_value, message=f"Please use {max_value} characters or fewer."))
+
+    return validators
+
+
+def range_render_kw(
+        min_value: int | None = None,
+        max_value: int | None = None,
+        step: int | None = None,
+        required: bool = False,
+        required_message: str | None = None,
+        autocomplete: Sequence[AutocompletePart] | Literal["on", "off"] | None = None,
+) -> dict:
+    validate_length_bounds(min_value, max_value)
+    if step is not None and step <= 0:
+        raise ValueError("`step` cannot be less than or equal to zero.")
+
+    render_kw: dict = required_render_kw(required_message) if required else {}
+
+    if min_value is not None:
+        render_kw["min"] = min_value
+        render_kw["data-msg-range-underflow"] = f"Range must be {min_value} or more."
+
+    if max_value is not None:
+        render_kw["max"] = max_value
+        render_kw["data-msg-range-overflow"] = f"Range must be {max_value} or less."
+
+    if autocomplete is not None:
+        render_kw["autocomplete"] = (
+            autocomplete
+            if isinstance(autocomplete, str)
+            else " ".join(map(str, autocomplete))
+        )
+
+    render_kw.update({
+        "type": "range",
+    })
+
+    return render_kw
+
+# ------------------------------------------------------------------------------------------------------
+# PHONE VALIDATION
+# ------------------------------------------------------------------------------------------------------
+PHONE_INVALID = "Please enter a valid phone number."
+PHONE_TOO_LONG = f"Please use {PHONE_MAX_LENGTH} characters or fewer."
+PHONE_NOT_POSSIBLE = "This phone number has an invalid length."
+PHONE_INPUT_PATTERN = (
+    r"^\+?[0-9\s().-]+?"
+    r"(?:\s*(?:ext\.?|x|#)\s*\d{1,10})?$"
+)
+
+
+def normalize_phone_number(
+        value: str | None,
+        region: str,
+) -> str | None:
+    if not value:
+        return None
+
+    phone = phonenumbers.parse(
+        value,
+        region,
+    )
+
+    return phonenumbers.format_number(
+        phone,
+        phonenumbers.PhoneNumberFormat.E164,
+    )
+
+
+def validate_phone_number(form, field) -> None:
+    """
+    Validate and automatically normalise a phone number to E.164.
+
+    Uses the selected country as the default region for
+    national-format phone numbers.
+    """
+
+    if not field.data:
+        return
+
+    region = form.country_code.data or None
+
+    try:
+        phone = phonenumbers.parse(
+            field.data,
+            region,
+        )
+
+    except NumberParseException as exc:
+        raise ValidationError(PHONE_INVALID) from exc
+
+    if not phonenumbers.is_possible_number(phone):
+        raise ValidationError(PHONE_NOT_POSSIBLE)
+
+    if not phonenumbers.is_valid_number(phone):
+        raise ValidationError(PHONE_INVALID)
+
+    # Automatically normalise the validated number.
+    field.data = phonenumbers.format_number(
+        phone,
+        phonenumbers.PhoneNumberFormat.E164,
+    )
+
+
+def phone_validators(required: bool = False, required_message: str | None = None) -> list:
+    validators: list = required_validators(DataRequired, required_message) if required else [Optional()]
+
+    validators.extend([
+        Length(
+            max=PHONE_MAX_LENGTH,
+            message=PHONE_TOO_LONG
+        ),
+        Regexp(
+            PHONE_INPUT_PATTERN,
+            message=PHONE_INVALID,
+        ),
+        validate_phone_number,
+    ])
+
+    return validators
+
+
+def phone_render_kw(required: bool = False, required_message: str | None = None) -> dict:
+    render_kw: dict = required_render_kw(required_message) if required else {}
+    render_kw.update({
+        "type": "tel",
+        "pattern": PHONE_INPUT_PATTERN,
+        "data-msg-pattern-mismatch": PHONE_INVALID,
+        "maxlength": PHONE_MAX_LENGTH,
+        "data-msg-too-long": PHONE_TOO_LONG,
+        "autocomplete": "tel",
+    })
 
     return render_kw
 
@@ -127,6 +409,7 @@ def email_render_kw(required: bool = False, required_message: str | None = None)
         "maxlength": EMAIL_MAX_LENGTH,
         "data-msg-type-mismatch": EMAIL_INVALID,
         "data-msg-too-long": EMAIL_TOO_LONG,
+        "autocomplete": "email",
     })
 
     return render_kw
@@ -139,8 +422,10 @@ def password_validators(required: bool = False, required_message: str | None = N
     return string_validators(PASSWORD_MIN_LENGTH, PASSWORD_MAX_LENGTH, required, required_message)
 
 
-def password_render_kw(required: bool = False, required_message: str | None = None) -> dict:
-    return string_render_kw(PASSWORD_MIN_LENGTH, PASSWORD_MAX_LENGTH, required, required_message)
+def password_render_kw(required: bool = False, required_message: str | None = None, existing: bool = False) -> dict:
+    render_kw = string_render_kw(PASSWORD_MIN_LENGTH, PASSWORD_MAX_LENGTH, required, required_message)
+    render_kw["autocomplete"] = "current-password" if existing else "new-password"
+    return render_kw
 
 
 # ------------------------------------------------------------------------------------------------------
@@ -219,61 +504,205 @@ URL_INVALID = "Please enter a valid url."
 URL_TOO_LONG = f"Please use {URL_MAX_LENGTH} characters or fewer."
 
 
-def url_validators(required: bool = False, required_message: str | None = None) -> list:
-    validators: list = required_validators(DataRequired, required_message) if required else [Optional()]
+def url_validators(
+        max_len: int = URL_MAX_LENGTH,
+        required: bool = False,
+        required_message: str | None = None,
+) -> list:
+    validators: list = (
+        required_validators(DataRequired, required_message)
+        if required else [Optional()]
+    )
 
     validators.extend([
         URL(message=URL_INVALID),
-        Length(max=URL_MAX_LENGTH, message=URL_TOO_LONG),
+        Length(
+            max=max_len,
+            message=f"Please use {max_len} characters or fewer.",
+        ),
     ])
 
     return validators
 
 
-def url_render_kw(required: bool = False, required_message: str | None = None) -> dict:
-    render_kw: dict = required_render_kw(required_message) if required else {}
+def url_render_kw(
+        max_len: int = URL_MAX_LENGTH,
+        required: bool = False,
+        required_message: str | None = None,
+) -> dict:
+    render_kw = (
+        required_render_kw(required_message)
+        if required else {}
+    )
 
     render_kw.update({
         "type": "url",
-        "maxlength": URL_MAX_LENGTH,
+        "maxlength": max_len,
         "data-msg-type-mismatch": URL_INVALID,
-        "data-msg-too-long": URL_TOO_LONG,
+        "data-msg-too-long": (
+            f"Please use {max_len} characters or fewer."
+        ),
+        "autocomplete": "url",
     })
 
     return render_kw
+
+
+# ------------------------------------------------------------------------------------------------------
+# CAFE FORM HELPERS
+# ------------------------------------------------------------------------------------------------------
+
+COUNTRY_CHOICES = [
+    ("", "Select a country"),
+    *[
+        (country.alpha_2, country.name)
+        for country in sorted(
+            pycountry.countries,
+            key=lambda country: country.name.casefold(),
+        )
+    ],
+]
+
+
+# ------------------------------------------------------------------------------------------------------
+# FORMS
+# ------------------------------------------------------------------------------------------------------
+
+class CafeForm(FlaskForm):
+    # name = StringField(
+    #     "Cafe Name",
+    #     validators=string_validators(min_len=2, max_len=50, required=True),
+    #     render_kw=string_render_kw(min_len=2, max_len=50, required=True),
+    #     filters=[strip_string],
+    # )
+
+    phone_number = StringField(
+        "Phone Number (Optional)",
+        validators=phone_validators(),
+        render_kw=phone_render_kw(),
+        filters=[strip_string],
+    )
+
+    address_line_1 = StringField(
+        "Street Address",
+        validators=string_validators(min_len=3, max_len=200, required=True),
+        render_kw=string_render_kw(min_len=3, max_len=200, required=True, autocomplete=[
+            "address-line1",
+        ]),
+        filters=[strip_string],
+    )
+
+    address_line_2 = StringField(
+        "Apartment, Suite, Unit (Optional)",
+        validators=string_validators(max_len=200),
+        render_kw=string_render_kw(max_len=200, autocomplete=[
+            "address-line2",
+        ]),
+        filters=[strip_string],
+    )
+
+    location = StringField(
+        "City / Locality",
+        validators=string_validators(min_len=2, max_len=100, required=True),
+        render_kw=string_render_kw(min_len=2, max_len=100, required=True, autocomplete=[
+            "address-level2",
+        ]),
+        filters=[strip_string],
+    )
+
+    region = StringField(
+        "Province / State (Optional)",
+        validators=string_validators(max_len=100),
+        render_kw=string_render_kw(max_len=100, autocomplete=[
+            "address-level1",
+        ]),
+        filters=[strip_string],
+    )
+
+    postal_code = StringField(
+        "Postal Code (Optional)",
+        validators=string_validators(max_len=20),
+        render_kw=string_render_kw(max_len=20, autocomplete=[
+            "postal-code",
+        ]),
+        filters=[strip_string],
+    )
+
+    country_code = SelectField(
+        "Country",
+        choices=COUNTRY_CHOICES,
+        validators=required_validators(),
+        render_kw={
+            "required": True,
+            "autocomplete": "country",
+        },
+    )
+
+    # img_url = StringField(
+    #     "Thumbnail URL",
+    #     validators=url_validators(max_len=500, required=True),
+    #     render_kw=url_render_kw(max_len=500, required=True),
+    #     filters=[strip_string],
+    # )
+
+
+class CafeAddForm(CafeForm):
+    submit = SubmitField("Add Cafe")
+
+
+class CafeEditForm(CafeForm):
+    submit = SubmitField("Save Changes")
 
 
 # Create a form to submit café reviews
 class CafeReviewForm(FlaskForm):
     name = StringField(
         "Name",
-        validators=string_validators(max_len=50, required=True, required_message="Please enter your name."),
-        render_kw=string_render_kw(max_len=50, required=True, required_message="Please enter your name."),
+        validators=string_validators(
+            max_len=50,
+            required=True,
+            required_message="Please enter your name."
+        ),
+        render_kw=string_render_kw(
+            max_len=50, required=True,
+            required_message="Please enter your name.",
+            autocomplete=[
+                "name"
+            ]),
+        filters=[strip_string],
     )
 
     rating = IntegerField(
         "Rating",
         default=5,
-        validators=[
-            *required_validators(
-                InputRequired,
-                "Please rate the café."
-            ),
-            NumberRange(min=1, max=5),
-        ],
-        render_kw={
-            **required_render_kw("Please rate the café."),
-            "type": "range",
-            "min": 1,
-            "max": 5,
-            "step": 1,
-        },
+        validators=range_validators(
+            min_value=1,
+            max_value=5,
+            required=True,
+            required_message="Please rate the café.",
+        ),
+        render_kw=range_render_kw(
+            min_value=1,
+            max_value=5,
+            step=1,
+            required=True,
+            required_message="Please rate the café.",
+        ),
     )
 
     body = TextAreaField(
         "Your review",
-        validators=string_validators(max_len=500, required=True, required_message="Tell people what it's like."),
-        render_kw=string_render_kw(max_len=500, required=True, required_message="Tell people what it's like."),
+        validators=string_validators(
+            max_len=500,
+            required=True,
+            required_message="Tell people what it's like."
+        ),
+        render_kw=string_render_kw(
+            max_len=500,
+            required=True,
+            required_message="Tell people what it's like."
+        ),
+        filters=[strip_string],
     )
 
     submit = SubmitField("Post review")

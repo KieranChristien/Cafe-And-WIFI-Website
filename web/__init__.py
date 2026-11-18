@@ -36,6 +36,12 @@ def create_app() -> Flask:
 
     app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 
+    tomtom_api_key = env.get("TOMTOM_API_KEY")
+    if not tomtom_api_key:
+        raise RuntimeError("TOMTOM_API_KEY is not configured")
+
+    app.config["TOMTOM_API_KEY"] = tomtom_api_key
+
     # Extensions
     Bootstrap4(app)
     db.init_app(app)

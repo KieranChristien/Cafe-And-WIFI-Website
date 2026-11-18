@@ -6,13 +6,19 @@
 
         <nav aria-label="breadcrumb" class="mb-6">
             <ol class="breadcrumb fs-sm">
-                <li class="breadcrumb-item"><a class="breadcrumb-link" href="{{ url_for('main.home') }}">Home</a></li>
-                <li class="breadcrumb-divider">/</li>
-                <li class="breadcrumb-item"><a class="breadcrumb-link"
-                                               href="{{ url_for('main.home') }}#results">Coffee</a></li>
-                <li class="breadcrumb-divider">/</li>
-                <li class="breadcrumb-item" aria-current="page"><a class="breadcrumb-link active" href="listing.html">{{
-                    cafe.name }}</a></li>
+                <li class="breadcrumb-item">
+                    <a class="breadcrumb-link" href="{{ url_for('main.home') }}">
+                        Home
+                    </a>
+                </li>
+                <li class="breadcrumb-divider">
+                    /
+                </li>
+                <li class="breadcrumb-item" aria-current="page">
+                    <a class="breadcrumb-link active" href="{{ url_for('listing.view', cafe_id=cafe.id) }}">
+                        {{ cafe.name }}
+                    </a>
+                </li>
             </ol>
         </nav>
 
@@ -202,12 +208,18 @@
                                                                                           style="left:50%;top:50%">1</span>
                     </div>
 
-                    <p class="fw-semibold fs-sm mb-1">Sluizeken 14</p>
-                    <p class="fg-2 fs-sm mb-5">9000 Ghent, Belgium</p>
+                    <p class="fw-semibold fs-sm mb-1">{{ address.line1 }}</p>
+                    <p class="fg-2 fs-sm mb-5">{{ address.line2 }}</p>
 
                     <div class="d-grid gap-3 mb-6">
-                        <a class="btn-solid theme-primary" href="#">Get directions</a>
-                        <a class="btn-outline theme-secondary" href="#">+32 9 000 00 00</a>
+                        <a class="btn-solid theme-primary" href="{{ address.directions }}">
+                            Get directions
+                        </a>
+                        {% if phone_number %}
+                        <a class="btn-outline theme-secondary" href="#">
+                            {{ phone_number }}
+                        </a>
+                        {% endif %}
                     </div>
 
                     <h2 class="fs-sm fw-semibold mb-3">Opening hours</h2>
@@ -279,7 +291,7 @@
                         <div class="listing-media">
                             <div class="ph ph-16x9">Papier</div>
                         </div>
-                        <div class="listing-body"><h3 class="listing-title"><a href="listing.html">Papier Bookshop</a>
+                        <div class="listing-body"><h3 class="listing-title"><a href="view.html">Papier Bookshop</a>
                         </h3>
                             <div class="listing-meta"><span class="rating"><svg viewBox="0 0 16 16" fill="currentColor"
                                                                                 aria-hidden="true"><path
@@ -293,7 +305,7 @@
                         <div class="listing-media">
                             <div class="ph ph-16x9">Wielen</div>
                         </div>
-                        <div class="listing-body"><h3 class="listing-title"><a href="listing.html">Wielen Bike
+                        <div class="listing-body"><h3 class="listing-title"><a href="view.html">Wielen Bike
                             Repair</a></h3>
                             <div class="listing-meta"><span class="rating"><svg viewBox="0 0 16 16" fill="currentColor"
                                                                                 aria-hidden="true"><path
@@ -307,7 +319,7 @@
                         <div class="listing-media">
                             <div class="ph ph-16x9">De Vier Tafels</div>
                         </div>
-                        <div class="listing-body"><h3 class="listing-title"><a href="listing.html">De Vier Tafels</a>
+                        <div class="listing-body"><h3 class="listing-title"><a href="view.html">De Vier Tafels</a>
                         </h3>
                             <div class="listing-meta"><span class="rating"><svg viewBox="0 0 16 16" fill="currentColor"
                                                                                 aria-hidden="true"><path
