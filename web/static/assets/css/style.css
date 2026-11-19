@@ -170,7 +170,9 @@
 
 .map-pin.is-active {
     background: var(--bs-fg-body);
+    color: var(--bs-bg-body);
     scale: 1.15;
+    transform-origin: left bottom;
 }
 
 /* --------------------------------------------------------------- Filters */

@@ -89,8 +89,15 @@
                     <div class="menu">
                         <a class="menu-item" href="{{ sort_by_url('top-rated') }}#results">Top rated</a>
                         <a class="menu-item" href="{{ sort_by_url('most-reviewed') }}#results">Most reviewed</a>
-                        <a class="menu-item" href="{{ sort_by_url('nearest') }}#results">Nearest</a>
+                        <a class="menu-item" href="{{ sort_by_url('nearest') }}#results" data-nearest-sort>Nearest</a>
                         <a class="menu-item" href="{{ sort_by_url('recently-added') }}#results">Recently added</a>
+
+                        <span
+                                id="nearestSortStatus"
+                                class="fs-xs fg-3"
+                                role="status"
+                                aria-live="polite"
+                        ></span>
                     </div>
                 </div>
 
@@ -569,6 +576,18 @@
                     name="sort_by"
                     value="{{ sort_by }}"
             >
+
+            <input type="hidden" name="sort_by" value="{{ sort_by }}">
+
+            {% if user_coordinates %}
+            <input type="hidden"
+                   name="user_latitude"
+                   value="{{ user_coordinates[0] }}">
+
+            <input type="hidden"
+                   name="user_longitude"
+                   value="{{ user_coordinates[1] }}">
+            {% endif %}
 
             <button
                     class="btn-solid theme-primary w-100 mt-6"

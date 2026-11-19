@@ -245,7 +245,7 @@ const createMapPinIcon = ({
         className: 'map-marker-wrapper',
         html: pin,
         iconSize: [28, 28],
-        iconAnchor: [14, 28],
+        iconAnchor: [0, 28],
     })
 }
 
@@ -1461,6 +1461,79 @@ const initResultsMap = () => {
 }
 
 
+const initNearestSort = () => {
+    const link = document.querySelector('[data-nearest-sort]')
+    const status = document.getElementById('nearestSortStatus')
+
+    if (!link) return
+
+    link.addEventListener('click', event => {
+        event.preventDefault()
+
+        if (!navigator.geolocation) {
+            if (status) {
+                status.textContent =
+                    'Geolocation is not supported by your browser.'
+            }
+            return
+        }
+
+        if (link.dataset.locating === 'true') return
+
+        link.dataset.locating = 'true'
+
+        if (status) {
+            status.textContent = 'Getting your location…'
+        }
+
+        navigator.geolocation.getCurrentPosition(
+            position => {
+                const url = new URL(
+                    link.href,
+                    window.location.href
+                )
+
+                url.searchParams.set(
+                    'user_latitude',
+                    position.coords.latitude.toFixed(5)
+                )
+
+                url.searchParams.set(
+                    'user_longitude',
+                    position.coords.longitude.toFixed(5)
+                )
+
+                url.hash = 'results'
+
+                window.location.assign(url.href)
+            },
+
+            error => {
+                delete link.dataset.locating
+
+                if (!status) return
+
+                const messages = {
+                    1: 'Location permission denied.',
+                    2: 'Your location is unavailable.',
+                    3: 'Location request timed out.'
+                }
+
+                status.textContent =
+                    messages[error.code] ||
+                    'Unable to retrieve your location.'
+            },
+
+            {
+                enableHighAccuracy: false,
+                maximumAge: 300000,
+                timeout: 10000
+            }
+        )
+    })
+}
+
+
 onReady(() => {
     initBase()
     initFormValidation()
@@ -1471,6 +1544,7 @@ onReady(() => {
     initListingMap()
     initResultsMap()
     initMapSync()
+    initNearestSort()
     initOpenDatepicker()
     initShareButton()
     initYear()

@@ -11,17 +11,23 @@ main = Blueprint('main', __name__)
 SortTypes = Literal[
     "top-rated",
     "most-reviewed",
-    "recently-added"
+    "nearest",
+    "recently-added",
 ]
 
 SORT_LABELS = {
     "top-rated": "Top rated",
     "most-reviewed": "Most reviewed",
+    "nearest": "Nearest",
     "recently-added": "Recently added",
 }
 
 
-def _apply_sort(stmt, sort_by: SortTypes):
+def _apply_sort(
+        stmt,
+        sort_by: SortTypes,
+        user_coordinates: tuple[float, float] | None = None,
+):
     stmt = stmt.order_by(None)
 
     if sort_by == "recently-added":
@@ -41,8 +47,34 @@ def _apply_sort(stmt, sort_by: SortTypes):
             average_rating.desc(),
             Cafe.id.asc(),
         )
-    else:
-        return stmt.order_by(Cafe.id.asc())
+    elif sort_by == "nearest":
+        if user_coordinates is None:
+            return stmt.order_by(Cafe.id.asc())
+
+        user_latitude, user_longitude = user_coordinates
+
+        longitude_scale = math.cos(
+            math.radians(user_latitude)
+        )
+
+        latitude_delta = Cafe.latitude - user_latitude
+
+        longitude_delta = (
+                                  Cafe.longitude - user_longitude
+                          ) * longitude_scale
+
+        distance_squared = (
+                latitude_delta * latitude_delta
+                + longitude_delta * longitude_delta
+        )
+
+        return stmt.order_by(
+            Cafe.latitude.is_(None).asc(),
+            distance_squared.asc(),
+            Cafe.id.asc(),
+        )
+
+    return stmt.order_by(Cafe.id.asc())
 
 
 def _get_filtered_cafes():
@@ -73,6 +105,24 @@ def _get_sort_by() -> SortTypes:
         return "top-rated"
 
     return cast(SortTypes, value)
+
+
+def _get_user_coordinates() -> tuple[float, float] | None:
+    latitude = request.args.get("user_latitude", type=float)
+    longitude = request.args.get("user_longitude", type=float)
+
+    if latitude is None or longitude is None:
+        return None
+
+    if not (
+            math.isfinite(latitude)
+            and math.isfinite(longitude)
+            and -90 <= latitude <= 90
+            and -180 <= longitude <= 180
+    ):
+        return None
+
+    return latitude, longitude
 
 
 def _pagination_url(page):
@@ -122,10 +172,14 @@ def home():
     per_page = 4
 
     sort_by = _get_sort_by()
+    user_coordinates = _get_user_coordinates()
 
-    # Retrieve and paginate cafés.
     stmt = _get_filtered_cafes()
-    stmt = _apply_sort(stmt, sort_by)
+    stmt = _apply_sort(
+        stmt,
+        sort_by,
+        user_coordinates
+    )
 
     pagination = db.paginate(
         stmt,
@@ -229,6 +283,7 @@ def home():
         "index.html",
         cafes=cafes,
         map_locations=map_locations,
+        user_coordinates=user_coordinates,
         pagination=pagination,
         pagination_url=_pagination_url,
         remove_filter_url=_remove_filter_url,
