@@ -1,51 +1,207 @@
-from flask import Blueprint, flash, redirect, render_template, url_for, jsonify
+import re
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+from flask import Blueprint, flash, redirect, render_template, url_for, jsonify, request
 
 from web.extensions import db, limiter
-from web.forms import CafeAddForm, CafeEditForm, CafeReviewForm
+from web.forms import CafeAddressForm, CafeEditForm, CafeReviewForm
 from web.models import Cafe, CafeReview
 from web.services.database import commit_session
-from web.services.geocoding import AddressNotFound, GeocodingUnavailable, get_directions_url, search_address
+from web.services.geocoding import AddressNotFound, GeocodingUnavailable, geocode_rough_address, get_directions_url, \
+    reverse_geocode
 from web.utils import format_phone_number
 
 listing = Blueprint('listing', __name__)
+
+_COORDINATE_PATTERN = re.compile(
+    r"[+-]?(?:\d+(?:\.\d*)?|\.\d+)\Z"
+)
+
+COORDINATE_PRECISION = Decimal("0.0000001")
+
+
+def parse_coordinate(
+        raw_value: str | None,
+        *,
+        minimum: Decimal,
+        maximum: Decimal,
+) -> Decimal:
+    """Validate and normalise a coordinate to seven decimal places."""
+
+    if not isinstance(raw_value, str):
+        raise ValueError("Coordinate is missing.")
+
+    raw_value = raw_value.strip()
+
+    if (
+            not raw_value
+            or len(raw_value) > 32
+            or not _COORDINATE_PATTERN.fullmatch(raw_value)
+    ):
+        raise ValueError("Invalid coordinate format.")
+
+    try:
+        value = Decimal(raw_value)
+
+    except InvalidOperation as exc:
+        raise ValueError("Invalid coordinate.") from exc
+
+    if not value.is_finite():
+        raise ValueError("Coordinate must be finite.")
+
+    if not minimum <= value <= maximum:
+        raise ValueError("Coordinate is outside its permitted range.")
+
+    try:
+        return value.quantize(
+            COORDINATE_PRECISION,
+            rounding=ROUND_HALF_UP,
+        )
+
+    except InvalidOperation as exc:
+        raise ValueError("Unable to normalise coordinate.") from exc
+
+
+def _render_edit_page(
+        cafe: Cafe,
+        edit_form: CafeEditForm,
+        address_form: CafeAddressForm,
+):
+    """Re-render the edit page while preserving the submitted map state."""
+
+    if request.method == "POST":
+        selected_address_query = (
+            request.form.get("address_query", "").strip()[:300]
+        )
+
+        # Recover the selected marker coordinates.
+        try:
+            selected_latitude = parse_coordinate(
+                request.form.get("latitude"),
+                minimum=Decimal("-90"),
+                maximum=Decimal("90"),
+            )
+
+            selected_longitude = parse_coordinate(
+                request.form.get("longitude"),
+                minimum=Decimal("-180"),
+                maximum=Decimal("180"),
+            )
+
+        except ValueError:
+            selected_latitude = None
+            selected_longitude = None
+
+        # Recover the map viewport, if it was submitted.
+        try:
+            map_center_latitude = parse_coordinate(
+                request.form.get("map_center_latitude"),
+                minimum=Decimal("-90"),
+                maximum=Decimal("90"),
+            )
+
+            map_center_longitude = parse_coordinate(
+                request.form.get("map_center_longitude"),
+                minimum=Decimal("-180"),
+                maximum=Decimal("180"),
+            )
+
+        except ValueError:
+            map_center_latitude = selected_latitude
+            map_center_longitude = selected_longitude
+
+        zoom_value = request.form.get("map_zoom", "")
+
+        if re.fullmatch(r"\d{1,2}", zoom_value):
+            map_zoom = int(zoom_value)
+            if not 0 <= map_zoom <= 19:
+                map_zoom = 18
+        else:
+            map_zoom = 18
+
+    else:
+        # On the initial GET, use the café's currently saved coordinates.
+        selected_address_query = ""
+
+        selected_latitude = cafe.latitude
+        selected_longitude = cafe.longitude
+
+        map_center_latitude = cafe.latitude
+        map_center_longitude = cafe.longitude
+
+        map_zoom = 18
+
+    # Never restore a viewport without a valid marker position.
+    if selected_latitude is None or selected_longitude is None:
+        map_center_latitude = None
+        map_center_longitude = None
+
+    elif map_center_latitude is None or map_center_longitude is None:
+        map_center_latitude = selected_latitude
+        map_center_longitude = selected_longitude
+
+    return render_template(
+        "./listing/edit.html",
+        cafe=cafe,
+        edit_form=edit_form,
+        address_form=address_form,
+        website_title=cafe.name,
+
+        selected_address_query=selected_address_query,
+        selected_latitude=selected_latitude,
+        selected_longitude=selected_longitude,
+
+        map_center_latitude=map_center_latitude,
+        map_center_longitude=map_center_longitude,
+        map_zoom=map_zoom,
+    )
 
 
 @listing.route('/listing/add', methods=['GET', 'POST'])
 @limiter.limit("5 per minute", methods=["POST"])
 def add():
-    form = CafeAddForm()
-
-    if form.validate_on_submit():
-        try:
-            candidates = search_address(
-                address_line_1=form.address_line_1.data,
-                city=form.location.data,
-                region=form.region.data,
-                postal_code=form.postal_code.data,
-                country_code=form.country_code.data,
-            )
-
-        except AddressNotFound as exc:
-            form.address_line_1.errors.append(str(exc))
-
-        except GeocodingUnavailable:
-            flash(
-                "The address verification service is temporarily unavailable.",
-                "error",
-            )
-
-        else:
-            # Present candidates to the user for confirmation.
-            return render_template(
-                "listing/confirm_location.html",
-                form=form,
-                candidates=candidates,
-            )
-
     return render_template(
         "./listing/edit.html",
         website_title="Add Cafe"
     )
+
+
+@listing.route(
+    '/listing/<int:cafe_id>/address-preview',
+    methods=['POST'],
+)
+@limiter.limit("10 per minute", methods=["POST"])
+def address_preview(cafe_id: int):
+    cafe = db.session.get(Cafe, cafe_id)
+
+    if cafe is None:
+        return jsonify({
+            "error": "Cafe not found."
+        }), 404
+
+    form = CafeAddressForm()
+
+    if not form.validate_on_submit():
+        return jsonify({
+            "error": "Please enter a valid address.",
+            "errors": form.errors,
+        }), 400
+
+    try:
+        location = geocode_rough_address(
+            form.address.data
+        )
+
+    except AddressNotFound as exc:
+        return jsonify({
+            "error": str(exc)
+        }), 404
+
+    except GeocodingUnavailable:
+        return jsonify({
+            "error": "The location service is unavailable."
+        }), 503
+
+    return jsonify(location)
 
 
 @listing.route('/listing/<int:cafe_id>/edit', methods=['GET', 'POST'])
@@ -57,102 +213,106 @@ def edit(cafe_id: int):
         flash("Cafe not found.", "error")
         return redirect(url_for("main.home"))
 
-    form = CafeEditForm()
+    edit_form = CafeEditForm()
+    address_form = CafeAddressForm()
 
-    if form.validate_on_submit():
-        updates = {}
-        lookup_failed = False
+    if edit_form.validate_on_submit():
 
-        # -----------------------------------------------------
-        # Phone number
-        # -----------------------------------------------------
+        # --------------------------------------------------
+        # Validate selected coordinates
+        # --------------------------------------------------
 
-        phone_number = (form.phone_number.data or "").strip() or None
-
-        if phone_number != cafe.phone_number:
-            updates["phone_number"] = phone_number
-
-        # -----------------------------------------------------
-        # Address verification
-        # -----------------------------------------------------
         try:
-            candidates = search_address(
-                address_line_1=form.address_line_1.data,
-                city=form.location.data,
-                region=form.region.data,
-                postal_code=form.postal_code.data,
-                country_code=form.country_code.data,
+            latitude = parse_coordinate(
+                request.form.get("latitude"),
+                minimum=Decimal("-90"),
+                maximum=Decimal("90"),
             )
 
-        except AddressNotFound as exc:
-            form.address_line_1.errors.append(str(exc))
-            lookup_failed = True
+            longitude = parse_coordinate(
+                request.form.get("longitude"),
+                minimum=Decimal("-180"),
+                maximum=Decimal("180"),
+            )
 
-        except GeocodingUnavailable:
+        except ValueError:
             flash(
-                "The address verification service is temporarily unavailable.",
+                "Please select a valid café location on the map.",
                 "error",
             )
-            lookup_failed = True
 
-        else:
-            # -------------------------------------------------
-            # Multiple candidates: request user confirmation
-            # -------------------------------------------------
-
-            if len(candidates) > 1:
-                return jsonify(candidates)
-
-            if not candidates:
-                form.address_line_1.errors.append(
-                    "No matching building address was found."
-                )
-                lookup_failed = True
-            else:
-                result = candidates[0]
-                address = result["provider_address"]
-
-                # ---------------------------------------------
-                # Build address updates
-                # ---------------------------------------------
-
-                updates.update({
-                    "location": (
-                            address.get("municipalitySubdivision")
-                            or address.get("municipality")
-                    ),
-                    "address_line_1": (
-                        f"{address.get('houseNumber', '')} "
-                        f"{address.get('street', '')}"
-                    ).strip(),
-                    "address_line_2": (form.address_line_2.data or "").strip() or None,
-                    "postal_code": (
-                            address.get("extendedPostalCode")
-                            or address.get("postalCode")
-                    ),
-                    "city": address.get("municipality"),
-                    "country": address.get("country"),
-                    "latitude": result["latitude"],
-                    "longitude": result["longitude"],
-                    "location_provider": result["provider"],
-                    "location_provider_id": result["provider_id"],
-                })
-
-        # -----------------------------------------------------
-        # Handle address verification failure
-        # -----------------------------------------------------
-
-        if lookup_failed:
             return render_template(
                 "./listing/edit.html",
                 cafe=cafe,
-                form=form,
+                edit_form=edit_form,
+                address_form=address_form,
                 website_title=cafe.name,
             )
 
-        # -----------------------------------------------------
+        # --------------------------------------------------
+        # Reverse geocode selected position
+        # --------------------------------------------------
+
+        try:
+
+            address = reverse_geocode(
+                latitude=latitude,
+                longitude=longitude,
+            )
+
+        except AddressNotFound as exc:
+
+            flash(str(exc), "error")
+
+            return _render_edit_page(
+                cafe,
+                edit_form,
+                address_form,
+            )
+
+        except GeocodingUnavailable:
+
+            flash(
+                "The address verification service is "
+                "temporarily unavailable.",
+                "error",
+            )
+
+            return _render_edit_page(
+                cafe,
+                edit_form,
+                address_form,
+            )
+
+        # --------------------------------------------------
+        # Build database updates
+        # --------------------------------------------------
+
+        updates = {
+
+            # General café information
+            "phone_number": (edit_form.phone_number.data or "").strip() or None,
+
+            # Address
+            "address_line_1": address["address_line_1"],
+            "address_line_2": address["address_line_2"],
+            "location": address["location"],
+            "postal_code": address["postal_code"],
+            "city": address["city"],
+            "country": address["country"],
+
+            # Coordinates
+            "latitude": latitude,
+            "longitude": longitude,
+
+            # Geocoding metadata
+            "location_provider": address["provider"],
+            "location_provider_id": address["provider_id"],
+        }
+
+        # --------------------------------------------------
         # Apply only actual changes
-        # -----------------------------------------------------
+        # --------------------------------------------------
 
         changed = {
             key: value
@@ -163,10 +323,6 @@ def edit(cafe_id: int):
         for key, value in changed.items():
             setattr(cafe, key, value)
 
-        # -----------------------------------------------------
-        # Commit transaction
-        # -----------------------------------------------------
-
         if changed and not commit_session(
                 success_message="Cafe updated successfully!",
                 error_message="Unable to update the cafe. Please try again.",
@@ -174,17 +330,26 @@ def edit(cafe_id: int):
                 debug_message=f"Failed to update cafe ID {cafe_id}.",
                 integrity_debug_message=f"Integrity violation updating cafe ID {cafe_id}.",
         ):
-            return redirect(
-                url_for("listing.edit", cafe_id=cafe_id)
+            return render_template(
+                "./listing/edit.html",
+                cafe=cafe,
+                edit_form=edit_form,
+                address_form=address_form,
+                website_title=cafe.name,
             )
 
-        return redirect(url_for("listing.view", cafe_id=cafe_id))
+        return redirect(
+            url_for("listing.view", cafe_id=cafe_id)
+        )
 
-    return render_template(
-        "./listing/edit.html",
-        cafe=cafe,
-        form=form,
-        website_title=cafe.name,
+    # ------------------------------------------------------
+    # GET request
+    # ------------------------------------------------------
+
+    return _render_edit_page(
+        cafe,
+        edit_form,
+        address_form,
     )
 
 

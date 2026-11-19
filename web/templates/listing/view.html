@@ -204,9 +204,22 @@
 
             <aside class="lg:col-4">
                 <div class="surface surface-pad" style="position:sticky;top:5.5rem">
-                    <div class="map-canvas rounded-5 mb-5" style="aspect-ratio:4/3"><span class="map-pin is-active"
-                                                                                          style="left:50%;top:50%">1</span>
+                    {% if cafe.latitude is not none and cafe.longitude is not none %}
+                    <div
+                            id="listingMap"
+                            class="map-canvas rounded-5 overflow-hidden mb-5"
+                            data-latitude="{{ cafe.latitude }}"
+                            data-longitude="{{ cafe.longitude }}"
+                            data-title="{{ cafe.name }}"
+                            role="region"
+                            aria-label="Map showing the location of {{ cafe.name }}"
+                            style="aspect-ratio:4/3"
+                    ></div>
+                    {% else %}
+                    <div class="map-canvas rounded-5 mb-5" role="status" style="aspect-ratio:4/3">
+                        <p class="mb-0">Location map unavailable.</p>
                     </div>
+                    {% endif %}
 
                     <p class="fw-semibold fs-sm mb-1">{{ address.line1 }}</p>
                     <p class="fg-2 fs-sm mb-5">{{ address.line2 }}</p>

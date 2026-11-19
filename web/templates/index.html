@@ -162,7 +162,10 @@
                     {% for item in cafes %}
                     {% set cafe = item.cafe %}
                     <div class="md:col-6">
-                        <article class="listing surface lift">
+                        <article
+                                class="listing surface lift"
+                                data-cafe-id="{{ cafe.id }}"
+                        >
                             <div class="listing-media">
                                 <button class="btn-icon btn-sm listing-save" type="button"
                                         aria-label="Save {{ cafe.name }}">
@@ -280,20 +283,39 @@
             <!-- Map -->
             <aside class="lg:col-4 d-none lg:d-block">
                 <div class="map-rail">
-                    <div class="map-canvas">
-                        <span class="map-pin is-active" style="left:38%;top:32%">1</span>
-                        <span class="map-pin" style="left:62%;top:46%">2</span>
-                        <span class="map-pin" style="left:28%;top:64%">3</span>
-                        <span class="map-pin" style="left:71%;top:72%">4</span>
+
+                    {% if map_locations %}
+
+                    <div
+                            id="resultsMap"
+                            class="map-canvas"
+                            role="region"
+                            aria-label="Map showing cafés on this results page"
+                    ></div>
+
+                    <script type="application/json" id="mapLocations">
+                        {{ map_locations | tojson }}
+                    </script>
+
+                    <div class="p-4 bg-2">
+                        <p class="fs-xs fg-3 mb-0">
+                            Showing {{ map_locations|length }}
+                            {{ 'location' if map_locations|length == 1 else 'locations' }}
+                            on this page. Drag to explore and use the zoom controls to inspect nearby streets.
+                        </p>
                     </div>
-                    <div class="p-4 bg-2 d-flex align-items-center gap-3">
-                        <div class="form-field flex-grow-1">
-                            <div class="switch">
-                                <input type="checkbox" value="" id="mapMove" role="switch" switch checked>
-                            </div>
-                            <label for="mapMove" class="fs-sm">Search as I move the map</label>
-                        </div>
+
+                    {% else %}
+
+                    <div class="map-empty p-5 text-center" role="status">
+                        <p class="fg-2 mb-2">No mapped locations on this page.</p>
+                        <p class="fs-xs fg-3 mb-0">
+                            These cafés do not have verified coordinates yet.
+                        </p>
                     </div>
+
+                    {% endif %}
+
                 </div>
             </aside>
         </div>

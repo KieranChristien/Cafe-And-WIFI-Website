@@ -8,74 +8,76 @@
  * Tooltip, Popover and Toast stay opt-in and must be constructed.
  */
 
-import { Tooltip, Popover, Toast } from 'bootstrap'
+import {Tooltip, Popover, Toast} from 'bootstrap'
 
 /* Color mode — v6 has no $enable-dark-mode Sass flag; dark is always compiled
    and switched at runtime with data-bs-theme on <html>. */
 export const initColorMode = (storageKey = 'bs6-theme') => {
-  const toggle = document.getElementById('themeToggle')
-  if (!toggle) return
+    const toggle = document.getElementById('themeToggle')
+    if (!toggle) return
 
-  const root = document.documentElement
-  const stored = localStorage.getItem(storageKey)
-  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)')
+    const root = document.documentElement
+    const stored = localStorage.getItem(storageKey)
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)')
 
-  const apply = (mode) => {
-    root.setAttribute('data-bs-theme', mode)
-    toggle.setAttribute('aria-pressed', String(mode === 'dark'))
-  }
+    const apply = (mode) => {
+        root.setAttribute('data-bs-theme', mode)
+        toggle.setAttribute('aria-pressed', String(mode === 'dark'))
+    }
 
-  apply(stored ?? (prefersDark.matches ? 'dark' : 'light'))
+    apply(stored ?? (prefersDark.matches ? 'dark' : 'light'))
 
-  toggle.addEventListener('click', () => {
-    const next = root.getAttribute('data-bs-theme') === 'dark' ? 'light' : 'dark'
-    localStorage.setItem(storageKey, next)
-    apply(next)
-  })
+    toggle.addEventListener('click', () => {
+        const next = root.getAttribute('data-bs-theme') === 'dark' ? 'light' : 'dark'
+        localStorage.setItem(storageKey, next)
+        apply(next)
+    })
 
-  prefersDark.addEventListener('change', (e) => {
-    if (!localStorage.getItem(storageKey)) apply(e.matches ? 'dark' : 'light')
-  })
+    prefersDark.addEventListener('change', (e) => {
+        if (!localStorage.getItem(storageKey)) apply(e.matches ? 'dark' : 'light')
+    })
 }
 
 /* Sticky header — CSS position:sticky can't report when it stuck, so watch a
    zero-height sentinel at the top of the document. */
 export const initStickyHeader = () => {
-  const header = document.querySelector('.site-header')
-  if (!header) return
+    const header = document.querySelector('.site-header')
+    if (!header) return
 
-  const sentinel = document.createElement('div')
-  sentinel.setAttribute('aria-hidden', 'true')
-  document.body.prepend(sentinel)
+    const sentinel = document.createElement('div')
+    sentinel.setAttribute('aria-hidden', 'true')
+    document.body.prepend(sentinel)
 
-  new IntersectionObserver(
-    ([entry]) => header.classList.toggle('is-stuck', !entry.isIntersecting),
-    { threshold: 0 }
-  ).observe(sentinel)
+    new IntersectionObserver(
+        ([entry]) => header.classList.toggle('is-stuck', !entry.isIntersecting),
+        {threshold: 0}
+    ).observe(sentinel)
 }
 
 /* Close the mobile drawer after tapping an in-page link */
 export const initDrawerAutoClose = () => {
-  document.querySelectorAll('dialog.drawer').forEach((drawer) => {
-    drawer.addEventListener('click', (e) => {
-      if (e.target.closest('a[href^="#"]')) drawer.close()
+    document.querySelectorAll('dialog.drawer').forEach((drawer) => {
+        drawer.addEventListener('click', (e) => {
+            if (e.target.closest('a[href^="#"]')) drawer.close()
+        })
     })
-  })
 }
 
 export const initTooltips = () => {
-  document.querySelectorAll('[data-bs-toggle="tooltip"]')
-    .forEach((el) => Tooltip.getOrCreateInstance(el))
+    document.querySelectorAll('[data-bs-toggle="tooltip"]')
+        .forEach((el) => Tooltip.getOrCreateInstance(el))
 }
 
 export const initPopovers = () => {
-  document.querySelectorAll('[data-bs-toggle="popover"]')
-    .forEach((el) => Popover.getOrCreateInstance(el))
+    document.querySelectorAll('[data-bs-toggle="popover"]')
+        .forEach((el) => Popover.getOrCreateInstance(el))
 }
 
 export const initYear = () => {
-  document.querySelectorAll('[data-year]')
-    .forEach((el) => { el.textContent = String(new Date().getFullYear()) })
+    document.querySelectorAll('[data-year]')
+        .forEach((el) => {
+            el.textContent = String(new Date().getFullYear())
+        })
 }
 
 /* Frontend-only form handling.
@@ -84,48 +86,112 @@ export const initYear = () => {
    is on the form precisely to suppress the browser bubbles so .invalid-feedback
    can show instead. */
 export const initDemoForms = () => {
-  document.querySelectorAll('form[data-demo-form]').forEach((form) => {
-    form.addEventListener('submit', (e) => {
-      e.preventDefault()
+    document.querySelectorAll('form[data-demo-form]').forEach((form) => {
+        form.addEventListener('submit', (e) => {
+            e.preventDefault()
 
-      if (!form.checkValidity()) {
-        form.querySelector(':invalid')?.focus()
-        return
-      }
+            if (!form.checkValidity()) {
+                form.querySelector(':invalid')?.focus()
+                return
+            }
 
-      const btn = form.querySelector('[type="submit"]')
-        || document.querySelector(`[form="${form.id}"]`)
-      if (!btn) return
+            const btn = form.querySelector('[type="submit"]')
+                || document.querySelector(`[form="${form.id}"]`)
+            if (!btn) return
 
-      const original = btn.textContent
-      btn.disabled = true
-      btn.textContent = btn.dataset.doneText || 'Sent ✓'
+            const original = btn.textContent
+            btn.disabled = true
+            btn.textContent = btn.dataset.doneText || 'Sent ✓'
 
-      window.setTimeout(() => {
-        btn.disabled = false
-        btn.textContent = original
-        form.reset()
-        form.closest('dialog.dialog')?.close()
-      }, 1400)
+            window.setTimeout(() => {
+                btn.disabled = false
+                btn.textContent = original
+                form.reset()
+                form.closest('dialog.dialog')?.close()
+            }, 1400)
+        })
     })
-  })
+}
+
+/* ---------------------------------------------------------------
+   Flask flash notifications
+   --------------------------------------------------------------- */
+
+export const initFlashMessages = () => {
+    const messages = document.querySelectorAll('[data-flash]')
+
+    messages.forEach((message) => {
+        const duration = Number(message.dataset.duration) || 7000
+
+        let timeoutId = null
+
+        const dismiss = () => {
+            if (message.dataset.dismissed === 'true') {
+                return
+            }
+
+            message.dataset.dismissed = 'true'
+
+            window.clearTimeout(timeoutId)
+
+            message.classList.add('is-leaving')
+
+            window.setTimeout(() => {
+                message.remove()
+            }, 220)
+        }
+
+        const scheduleDismiss = () => {
+            window.clearTimeout(timeoutId)
+
+            timeoutId = window.setTimeout(
+                dismiss,
+                duration
+            )
+        }
+
+        const pauseDismiss = () => {
+            window.clearTimeout(timeoutId)
+        }
+
+        // Manual dismissal.
+        message
+            .querySelector('[data-dismiss-flash]')
+            ?.addEventListener('click', dismiss)
+
+        // Pause while the user interacts with the notification.
+        message.addEventListener('pointerenter', pauseDismiss)
+        message.addEventListener('pointerleave', scheduleDismiss)
+
+        message.addEventListener('focusin', pauseDismiss)
+
+        message.addEventListener('focusout', (event) => {
+            if (!message.contains(event.relatedTarget)) {
+                scheduleDismiss()
+            }
+        })
+
+        // Start the automatic dismissal timer.
+        scheduleDismiss()
+    })
 }
 
 /* Run the whole standard set. Templates call this, then add their own. */
 export const initBase = () => {
-  initColorMode()
-  initStickyHeader()
-  initDrawerAutoClose()
-  initTooltips()
-  initPopovers()
-  initDemoForms()
-  initYear()
+    initColorMode()
+    initStickyHeader()
+    initDrawerAutoClose()
+    initTooltips()
+    initPopovers()
+    initDemoForms()
+    initFlashMessages()
+    initYear()
 }
 
 export const onReady = (fn) => {
-  document.readyState === 'loading'
-    ? document.addEventListener('DOMContentLoaded', fn)
-    : fn()
+    document.readyState === 'loading'
+        ? document.addEventListener('DOMContentLoaded', fn)
+        : fn()
 }
 
-export { Toast }
+export {Toast}

@@ -228,10 +228,12 @@ def string_render_kw(
 
     return render_kw
 
+
 # ------------------------------------------------------------------------------------------------------
 # RANGE VALIDATION
 # ------------------------------------------------------------------------------------------------------
 RATING_RANGE_INVALID = "Please choose a rating between 1 and 5."
+
 
 def range_validators(
         min_value: int | None = None,
@@ -287,6 +289,7 @@ def range_render_kw(
 
     return render_kw
 
+
 # ------------------------------------------------------------------------------------------------------
 # PHONE VALIDATION
 # ------------------------------------------------------------------------------------------------------
@@ -318,23 +321,22 @@ def normalize_phone_number(
 
 
 def validate_phone_number(form, field) -> None:
-    """
-    Validate and automatically normalise a phone number to E.164.
-
-    Uses the selected country as the default region for
-    national-format phone numbers.
-    """
+    """Validate and normalise phone numbers to E.164."""
 
     if not field.data:
         return
 
-    region = form.country_code.data or None
+    country_field = getattr(form, "country_code", None)
+    region = country_field.data if country_field is not None else None
+
+    # Without a country selection, require an international number.
+    if not region and not field.data.lstrip().startswith("+"):
+        raise ValidationError(
+            "Please include the international country code, e.g. +44."
+        )
 
     try:
-        phone = phonenumbers.parse(
-            field.data,
-            region,
-        )
+        phone = phonenumbers.parse(field.data, region)
 
     except NumberParseException as exc:
         raise ValidationError(PHONE_INVALID) from exc
@@ -345,7 +347,6 @@ def validate_phone_number(form, field) -> None:
     if not phonenumbers.is_valid_number(phone):
         raise ValidationError(PHONE_INVALID)
 
-    # Automatically normalise the validated number.
     field.data = phonenumbers.format_number(
         phone,
         phonenumbers.PhoneNumberFormat.E164,
@@ -568,6 +569,28 @@ COUNTRY_CHOICES = [
 # FORMS
 # ------------------------------------------------------------------------------------------------------
 
+class CafeAddressForm(FlaskForm):
+    address = StringField(
+        "Find the café's location",
+        validators=string_validators(
+            min_len=3,
+            max_len=300,
+            required=True,
+        ),
+        render_kw=string_render_kw(
+            min_len=3,
+            max_len=300,
+            required=True,
+            autocomplete=[
+                "street-address"
+            ],
+        ),
+        filters=[strip_string],
+    )
+
+    submit = SubmitField("Search")
+
+
 class CafeForm(FlaskForm):
     # name = StringField(
     #     "Cafe Name",
@@ -581,61 +604,6 @@ class CafeForm(FlaskForm):
         validators=phone_validators(),
         render_kw=phone_render_kw(),
         filters=[strip_string],
-    )
-
-    address_line_1 = StringField(
-        "Street Address",
-        validators=string_validators(min_len=3, max_len=200, required=True),
-        render_kw=string_render_kw(min_len=3, max_len=200, required=True, autocomplete=[
-            "address-line1",
-        ]),
-        filters=[strip_string],
-    )
-
-    address_line_2 = StringField(
-        "Apartment, Suite, Unit (Optional)",
-        validators=string_validators(max_len=200),
-        render_kw=string_render_kw(max_len=200, autocomplete=[
-            "address-line2",
-        ]),
-        filters=[strip_string],
-    )
-
-    location = StringField(
-        "City / Locality",
-        validators=string_validators(min_len=2, max_len=100, required=True),
-        render_kw=string_render_kw(min_len=2, max_len=100, required=True, autocomplete=[
-            "address-level2",
-        ]),
-        filters=[strip_string],
-    )
-
-    region = StringField(
-        "Province / State (Optional)",
-        validators=string_validators(max_len=100),
-        render_kw=string_render_kw(max_len=100, autocomplete=[
-            "address-level1",
-        ]),
-        filters=[strip_string],
-    )
-
-    postal_code = StringField(
-        "Postal Code (Optional)",
-        validators=string_validators(max_len=20),
-        render_kw=string_render_kw(max_len=20, autocomplete=[
-            "postal-code",
-        ]),
-        filters=[strip_string],
-    )
-
-    country_code = SelectField(
-        "Country",
-        choices=COUNTRY_CHOICES,
-        validators=required_validators(),
-        render_kw={
-            "required": True,
-            "autocomplete": "country",
-        },
     )
 
     # img_url = StringField(

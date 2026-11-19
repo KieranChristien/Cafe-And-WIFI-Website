@@ -1,3 +1,4 @@
+import math
 from flask import Blueprint, jsonify, render_template, request, url_for
 from typing import Literal, cast
 
@@ -151,6 +152,34 @@ def home():
             "review_count": review_count,
         })
 
+    # Build map locations from the current page only.
+    map_locations = []
+
+    for item in cafes:
+        cafe = item["cafe"]
+
+        if cafe.latitude is None or cafe.longitude is None:
+            continue
+
+        latitude = float(cafe.latitude)
+        longitude = float(cafe.longitude)
+
+        # Exclude invalid or non-finite coordinates.
+        if not (
+                math.isfinite(latitude)
+                and math.isfinite(longitude)
+                and -90 <= latitude <= 90
+                and -180 <= longitude <= 180
+        ):
+            continue
+
+        map_locations.append({
+            "id": cafe.id,
+            "name": cafe.name,
+            "latitude": latitude,
+            "longitude": longitude,
+        })
+
     cafe_amenities = CafeAttribute.get_by_category("amenity")
     cafe_payments = CafeAttribute.get_by_category("payment")
     cafe_features = CafeAttribute.get_by_category("feature")
@@ -199,6 +228,7 @@ def home():
     return render_template(
         "index.html",
         cafes=cafes,
+        map_locations=map_locations,
         pagination=pagination,
         pagination_url=_pagination_url,
         remove_filter_url=_remove_filter_url,

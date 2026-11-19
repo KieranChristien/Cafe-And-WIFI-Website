@@ -222,22 +222,169 @@ const bindRange = (rangeId, outId, format) => {
     sync()
 }
 
-/* Hovering a listing highlights its map pin */
+/* ---------------------------------------------------------------
+   Individual café location map
+   --------------------------------------------------------------- */
+
+const initListingMap = () => {
+    const mapElement = document.getElementById('listingMap')
+
+    if (!mapElement) return
+
+    if (!window.L) {
+        console.error('Leaflet is not available.')
+        return
+    }
+
+    const latitude = Number(mapElement.dataset.latitude)
+    const longitude = Number(mapElement.dataset.longitude)
+
+    // Validate coordinates before passing them to Leaflet.
+    const validCoordinates =
+        Number.isFinite(latitude) &&
+        Number.isFinite(longitude) &&
+        latitude >= -90 &&
+        latitude <= 90 &&
+        longitude >= -180 &&
+        longitude <= 180
+
+    if (!validCoordinates) {
+        console.error('Invalid café map coordinates.')
+        return
+    }
+
+    // Initialise the map.
+    const map = L.map(mapElement, {
+        zoomControl: true,
+
+        // Prevent the map from capturing normal page scrolling.
+        scrollWheelZoom: false,
+
+        // Allow users to explore the location.
+        dragging: true,
+        touchZoom: true,
+        doubleClickZoom: true,
+        keyboard: true,
+
+        // Restrict maximum zoom to the available tile level.
+        maxZoom: 19,
+    })
+
+    map.setView(
+        [latitude, longitude],
+        18
+    )
+
+    // OpenStreetMap tile layer.
+    L.tileLayer(
+        'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+        {
+            maxZoom: 19,
+            attribution: '&copy; OpenStreetMap contributors',
+        }
+    ).addTo(map)
+
+    // Create the café marker.
+    const marker = L.marker(
+        [latitude, longitude]
+    ).addTo(map)
+
+    // Use textContent so the café name is treated as text, not HTML.
+    const popupContent = document.createElement('span')
+
+    popupContent.textContent =
+        mapElement.dataset.title || 'Café location'
+
+    marker.bindPopup(popupContent)
+
+    // Ensure Leaflet calculates the correct dimensions.
+    requestAnimationFrame(() => {
+        map.invalidateSize()
+    })
+}
+
+/* ---------------------------------------------------------------
+   Highlight the map pin associated with a listing
+   --------------------------------------------------------------- */
+
 const initMapSync = () => {
-    const pins = document.querySelectorAll('.map-pin')
-    const listings = document.querySelectorAll('.listing')
+    const pins = document.querySelectorAll(
+        '.map-pin[data-cafe-id]'
+    )
+
+    const listings = document.querySelectorAll(
+        '.listing[data-cafe-id]'
+    )
+
     if (!pins.length || !listings.length) return
 
-    listings.forEach((listing, i) => {
-        const pin = pins[i]
-        if (!pin) return
-        const on = () => {
-            pins.forEach((p) => p.classList.remove('is-active'));
-            pin.classList.add('is-active')
+    const activate = (cafeId) => {
+        const selectedId = String(cafeId)
+
+        pins.forEach((pin) => {
+            pin.classList.toggle(
+                'is-active',
+                pin.dataset.cafeId === selectedId
+            )
+        })
+
+        listings.forEach((listing) => {
+            listing.classList.toggle(
+                'is-map-active',
+                listing.dataset.cafeId === selectedId
+            )
+        })
+    }
+
+    // Highlight the corresponding map pin when a listing is hovered
+    // or receives keyboard focus.
+    listings.forEach((listing) => {
+        const activateListing = () => {
+            activate(listing.dataset.cafeId)
         }
-        listing.addEventListener('mouseenter', on)
-        listing.addEventListener('focusin', on)
+
+        listing.addEventListener(
+            'mouseenter',
+            activateListing
+        )
+
+        listing.addEventListener(
+            'focusin',
+            activateListing
+        )
     })
+
+    // Also highlight the corresponding listing when interacting
+    // with a map marker.
+    pins.forEach((pin) => {
+        const markerElement = pin.closest(
+            '.leaflet-marker-icon'
+        )
+
+        if (!markerElement) return
+
+        const activatePin = () => {
+            activate(pin.dataset.cafeId)
+        }
+
+        markerElement.addEventListener(
+            'mouseenter',
+            activatePin
+        )
+
+        markerElement.addEventListener(
+            'focusin',
+            activatePin
+        )
+
+        markerElement.addEventListener(
+            'click',
+            activatePin
+        )
+    })
+
+    // Initially highlight the first marker.
+    activate(pins[0].dataset.cafeId)
 }
 
 
@@ -712,6 +859,391 @@ const initFeaturePicker = () => {
     syncHiddenFields()
 }
 
+const initLocationPicker = () => {
+
+    const addressForm = document.getElementById(
+        'addressForm'
+    )
+
+    const mapContainer = document.getElementById(
+        'locationMapContainer'
+    )
+
+    const mapElement = document.getElementById(
+        'locationMap'
+    )
+
+    const status = document.getElementById(
+        'addressSearchStatus'
+    )
+
+    const button = document.getElementById(
+        'findAddressButton'
+    )
+
+    const latitudeInput = document.getElementById(
+        'latitude'
+    )
+
+    const longitudeInput = document.getElementById(
+        'longitude'
+    )
+
+    const coordinatesOutput = document.getElementById(
+        'selectedCoordinates'
+    )
+
+    const addressInput = document.getElementById('cAddress')
+    const addressQueryInput = document.getElementById('addressQuery')
+
+    const mapCenterLatitudeInput = document.getElementById(
+        'mapCenterLatitude'
+    )
+
+    const mapCenterLongitudeInput = document.getElementById(
+        'mapCenterLongitude'
+    )
+
+    const mapZoomInput = document.getElementById('mapZoom')
+
+    if (
+        !addressForm ||
+        !mapContainer ||
+        !mapElement
+    ) {
+        return
+    }
+
+    let map = null
+    let marker = null
+
+    // --------------------------------------------------
+    // Update the selected coordinates
+    // --------------------------------------------------
+
+    const updateCoordinates = (latlng) => {
+
+        latitudeInput.value = latlng.lat.toFixed(7)
+
+        longitudeInput.value = latlng.lng.toFixed(7)
+
+        coordinatesOutput.textContent =
+            `Latitude: ${latitudeInput.value}, ` +
+            `Longitude: ${longitudeInput.value}`
+
+    }
+
+    // --------------------------------------------------
+    // Preserve the visible map centre and zoom
+    // --------------------------------------------------
+
+    const updateMapView = () => {
+        if (!map) return
+
+        const center = map.getCenter()
+
+        mapCenterLatitudeInput.value = center.lat.toFixed(7)
+        mapCenterLongitudeInput.value = center.lng.toFixed(7)
+        mapZoomInput.value = String(map.getZoom())
+    }
+
+
+    // --------------------------------------------------
+// Create or restore the map
+// --------------------------------------------------
+
+    const initialiseMap = (
+        latitude,
+        longitude,
+        viewState = {}
+    ) => {
+
+        mapContainer.hidden = false
+
+        const centerLatitude =
+            Number.isFinite(viewState.centerLatitude)
+                ? viewState.centerLatitude
+                : latitude
+
+        const centerLongitude =
+            Number.isFinite(viewState.centerLongitude)
+                ? viewState.centerLongitude
+                : longitude
+
+        const zoom =
+            Number.isInteger(viewState.zoom) &&
+            viewState.zoom >= 0 &&
+            viewState.zoom <= 19
+                ? viewState.zoom
+                : 18
+
+        if (!map) {
+
+            map = L.map(mapElement).setView(
+                [centerLatitude, centerLongitude],
+                zoom
+            )
+
+            L.tileLayer(
+                'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                {
+                    maxZoom: 19,
+                    attribution:
+                        '&copy; OpenStreetMap contributors'
+                }
+            ).addTo(map)
+
+            // Keep the hidden viewport fields up to date.
+            map.on('moveend zoomend', updateMapView)
+
+            // Clicking the map moves the marker.
+            map.on('click', (event) => {
+
+                if (marker) {
+                    marker.setLatLng(event.latlng)
+                } else {
+                    marker = L.marker(
+                        event.latlng,
+                        {draggable: true}
+                    ).addTo(map)
+
+                    marker.on('dragend', () => {
+                        updateCoordinates(marker.getLatLng())
+                    })
+                }
+
+                updateCoordinates(event.latlng)
+
+            })
+
+        } else {
+
+            map.setView(
+                [centerLatitude, centerLongitude],
+                zoom
+            )
+
+        }
+
+        // Leaflet must recalculate its size after the
+        // previously hidden container becomes visible.
+        requestAnimationFrame(() => {
+            map.invalidateSize()
+            updateMapView()
+        })
+
+        // Restore the marker independently of the map centre.
+        const markerPosition = L.latLng(
+            latitude,
+            longitude
+        )
+
+        if (marker) {
+            marker.setLatLng(markerPosition)
+        } else {
+            marker = L.marker(
+                markerPosition,
+                {draggable: true}
+            ).addTo(map)
+
+            marker.on('dragend', () => {
+                updateCoordinates(marker.getLatLng())
+            })
+        }
+
+        updateCoordinates(markerPosition)
+    }
+
+    // --------------------------------------------------
+    // Keep the rough address in the main form
+    // --------------------------------------------------
+
+    addressInput?.addEventListener('input', () => {
+
+        addressQueryInput.value = addressInput.value
+
+        // The previous selection may no longer match the new address.
+        latitudeInput.value = ''
+        longitudeInput.value = ''
+
+        mapCenterLatitudeInput.value = ''
+        mapCenterLongitudeInput.value = ''
+        mapZoomInput.value = '18'
+
+        mapContainer.hidden = true
+
+        status.textContent =
+            'Search for the updated address to select its location.'
+    })
+
+
+    // --------------------------------------------------
+    // Address form submission
+    // --------------------------------------------------
+
+    addressForm.addEventListener('submit', async (event) => {
+
+        event.preventDefault()
+
+        addressQueryInput.value = addressInput.value
+
+        if (!addressForm.reportValidity()) {
+            return
+        }
+
+        status.textContent = 'Finding location...'
+
+        button.disabled = true
+
+        try {
+
+            const response = await fetch(
+                addressForm.action,
+                {
+                    method: 'POST',
+                    body: new FormData(addressForm),
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                }
+            )
+
+            const result = await response.json()
+
+            if (!response.ok) {
+                throw new Error(
+                    result.error || 'Unable to find location.'
+                )
+            }
+
+            initialiseMap(
+                result.latitude,
+                result.longitude
+            )
+
+            status.textContent =
+                'Location found. Please select the café building.'
+
+        } catch (error) {
+
+            status.textContent = error.message
+
+        } finally {
+
+            button.disabled = false
+
+        }
+
+    })
+
+
+    // --------------------------------------------------
+    // Use the user's current location (optional)
+    // --------------------------------------------------
+
+    const locateButton = document.getElementById(
+        'locateMeButton'
+    )
+
+    locateButton?.addEventListener('click', () => {
+
+        if (!navigator.geolocation) {
+            status.textContent =
+                'Geolocation is not supported by your browser.'
+            return
+        }
+
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+
+                initialiseMap(
+                    position.coords.latitude,
+                    position.coords.longitude
+                )
+
+                status.textContent =
+                    'Current location selected.'
+
+            },
+            () => {
+
+                status.textContent =
+                    'Unable to retrieve your location.'
+
+            }
+        )
+
+    })
+
+    // --------------------------------------------------
+    // Restore a previous map selection after form errors
+    // --------------------------------------------------
+
+    const initialLatitudeText = latitudeInput.value.trim()
+    const initialLongitudeText = longitudeInput.value.trim()
+
+    if (initialLatitudeText && initialLongitudeText) {
+
+        const latitude = Number(initialLatitudeText)
+        const longitude = Number(initialLongitudeText)
+
+        const validCoordinates =
+            Number.isFinite(latitude) &&
+            Number.isFinite(longitude) &&
+            latitude >= -90 &&
+            latitude <= 90 &&
+            longitude >= -180 &&
+            longitude <= 180
+
+        if (validCoordinates) {
+
+            const savedCenterLatitude = Number(
+                mapCenterLatitudeInput.value
+            )
+
+            const savedCenterLongitude = Number(
+                mapCenterLongitudeInput.value
+            )
+
+            const validCenter =
+                mapCenterLatitudeInput.value.trim() !== '' &&
+                mapCenterLongitudeInput.value.trim() !== '' &&
+                Number.isFinite(savedCenterLatitude) &&
+                Number.isFinite(savedCenterLongitude) &&
+                savedCenterLatitude >= -90 &&
+                savedCenterLatitude <= 90 &&
+                savedCenterLongitude >= -180 &&
+                savedCenterLongitude <= 180
+
+            const savedZoom = Number(mapZoomInput.value)
+
+            initialiseMap(
+                latitude,
+                longitude,
+                {
+                    centerLatitude: validCenter
+                        ? savedCenterLatitude
+                        : latitude,
+
+                    centerLongitude: validCenter
+                        ? savedCenterLongitude
+                        : longitude,
+
+                    zoom: Number.isInteger(savedZoom) &&
+                    savedZoom >= 0 &&
+                    savedZoom <= 19
+                        ? savedZoom
+                        : 18
+                }
+            )
+
+            status.textContent =
+                'Your previous map selection has been restored. ' +
+                'You can adjust the marker if necessary.'
+        }
+    }
+}
+
 const initShareButton = () => {
     const button = document.querySelector('[data-share-url]')
     const status = document.getElementById('shareStatus')
@@ -737,13 +1269,184 @@ const initShareButton = () => {
 }
 
 
+/* ---------------------------------------------------------------
+   Results map
+   --------------------------------------------------------------- */
+
+const initResultsMap = () => {
+    const mapElement = document.getElementById('resultsMap')
+    const locationsElement = document.getElementById('mapLocations')
+
+    if (!mapElement || !locationsElement) return
+
+    if (!window.L) {
+        console.error('Leaflet is not available.')
+        return
+    }
+
+    let locations
+
+    try {
+        locations = JSON.parse(locationsElement.textContent)
+    } catch (error) {
+        console.error('Unable to read map locations:', error)
+        return
+    }
+
+    if (!Array.isArray(locations)) {
+        console.error('Invalid map locations.')
+        return
+    }
+
+    // Validate every location before adding it to the map.
+    const validLocations = locations.filter((location) => {
+        const latitude = Number(location.latitude)
+        const longitude = Number(location.longitude)
+
+        return (
+            Number.isSafeInteger(Number(location.id)) &&
+            Number.isFinite(latitude) &&
+            Number.isFinite(longitude) &&
+            latitude >= -90 &&
+            latitude <= 90 &&
+            longitude >= -180 &&
+            longitude <= 180
+        )
+    })
+
+    if (!validLocations.length) return
+
+    // Create the map.
+    const map = L.map(mapElement, {
+        zoomControl: true,
+        scrollWheelZoom: false,
+        dragging: true,
+        touchZoom: true,
+        doubleClickZoom: true,
+        keyboard: true,
+        maxZoom: 19,
+    })
+
+    // Add OpenStreetMap tiles.
+    L.tileLayer(
+        'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+        {
+            maxZoom: 19,
+            attribution: '&copy; OpenStreetMap contributors',
+        }
+    ).addTo(map)
+
+    const mapPoints = []
+
+    // Add one marker for each café.
+    validLocations.forEach((location, index) => {
+        const latitude = Number(location.latitude)
+        const longitude = Number(location.longitude)
+        const cafeId = String(location.id)
+
+        const position = L.latLng(
+            latitude,
+            longitude
+        )
+
+        mapPoints.push(position)
+
+        // Build the marker using DOM elements rather than
+        // interpolating café names into HTML.
+        const pin = document.createElement('span')
+
+        pin.className = 'map-pin'
+        pin.dataset.cafeId = cafeId
+        pin.textContent = String(index + 1)
+
+        const icon = L.divIcon({
+            className: 'map-marker-wrapper',
+            html: pin,
+            iconSize: [28, 28],
+            iconAnchor: [14, 28],
+        })
+
+        const marker = L.marker([
+            location.latitude,
+            location.longitude
+        ]).addTo(map);
+
+        // Safely display the café name in the popup.
+        const popup = document.createElement('span')
+        popup.textContent = location.name
+
+        marker.bindPopup(popup)
+    })
+
+    // --------------------------------------------------
+    // Fit all markers inside the visible map area.
+    // --------------------------------------------------
+
+    const fitMapToMarkers = () => {
+        map.invalidateSize({pan: false})
+
+        const mapSize = map.getSize()
+
+        // Don't attempt to fit the map while it has no dimensions.
+        // This can happen when the responsive sidebar is hidden.
+        if (!mapSize.x || !mapSize.y) return
+
+        if (mapPoints.length === 1) {
+            // A single location needs a useful local view.
+            map.setView(mapPoints[0], 15, {
+                animate: false,
+            })
+
+            return
+        }
+
+        const bounds = L.latLngBounds(mapPoints)
+
+        map.fitBounds(
+            bounds,
+            {
+                paddingTopLeft: [40, 40],
+                paddingBottomRight: [40, 40],
+                maxZoom: 15,
+                animate: false,
+            }
+        )
+    }
+
+    // Initialise once the map has dimensions.
+    // ResizeObserver also handles the map becoming visible
+    // when a user resizes from mobile to desktop.
+    if (
+        mapElement.clientWidth > 0 &&
+        mapElement.clientHeight > 0
+    ) {
+        requestAnimationFrame(fitMapToMarkers)
+    } else {
+        const resizeObserver = new ResizeObserver(() => {
+            if (
+                mapElement.clientWidth > 0 &&
+                mapElement.clientHeight > 0
+            ) {
+                resizeObserver.disconnect()
+
+                requestAnimationFrame(fitMapToMarkers)
+            }
+        })
+
+        resizeObserver.observe(mapElement)
+    }
+}
+
+
 onReady(() => {
     initBase()
     initFormValidation()
     initFeaturePicker()
+    initLocationPicker()
 
     bindRange('ratingRange', 'ratingOut', (v) => Number(v).toFixed(1))
-    initMapSync()
+    initListingMap()
+    initResultsMap()
     initOpenDatepicker()
     initShareButton()
     initYear()
