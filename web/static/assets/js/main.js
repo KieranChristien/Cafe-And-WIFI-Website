@@ -223,6 +223,33 @@ const bindRange = (rangeId, outId, format) => {
 }
 
 /* ---------------------------------------------------------------
+   Shared Leaflet map-pin icon
+   --------------------------------------------------------------- */
+
+const createMapPinIcon = ({
+                              label = '',
+                              active = false,
+                              cafeId = null,
+                          } = {}) => {
+
+    const pin = document.createElement('span')
+
+    pin.className = `map-pin${active ? ' is-active' : ''}`
+    pin.textContent = String(label)
+
+    if (cafeId !== null) {
+        pin.dataset.cafeId = String(cafeId)
+    }
+
+    return L.divIcon({
+        className: 'map-marker-wrapper',
+        html: pin,
+        iconSize: [28, 28],
+        iconAnchor: [14, 28],
+    })
+}
+
+/* ---------------------------------------------------------------
    Individual café location map
    --------------------------------------------------------------- */
 
@@ -286,7 +313,13 @@ const initListingMap = () => {
 
     // Create the café marker.
     const marker = L.marker(
-        [latitude, longitude]
+        [latitude, longitude],
+        {
+            icon: createMapPinIcon({
+                label: '1',
+                active: false,
+            }),
+        }
     ).addTo(map)
 
     // Use textContent so the café name is treated as text, not HTML.
@@ -303,88 +336,59 @@ const initListingMap = () => {
     })
 }
 
+const activateMapCafe = (cafeId) => {
+    const selectedId = String(cafeId)
+
+    // Highlight the corresponding map pin.
+    document.querySelectorAll(
+        '.map-pin[data-cafe-id]'
+    ).forEach((pin) => {
+        pin.classList.toggle(
+            'is-active',
+            pin.dataset.cafeId === selectedId
+        )
+    })
+
+    // Highlight the corresponding listing.
+    document.querySelectorAll(
+        '.listing[data-cafe-id]'
+    ).forEach((listing) => {
+        listing.classList.toggle(
+            'is-map-active',
+            listing.dataset.cafeId === selectedId
+        )
+    })
+}
+
 /* ---------------------------------------------------------------
    Highlight the map pin associated with a listing
    --------------------------------------------------------------- */
 
 const initMapSync = () => {
-    const pins = document.querySelectorAll(
-        '.map-pin[data-cafe-id]'
-    )
-
     const listings = document.querySelectorAll(
         '.listing[data-cafe-id]'
     )
 
-    if (!pins.length || !listings.length) return
+    if (!listings.length) return
 
-    const activate = (cafeId) => {
-        const selectedId = String(cafeId)
-
-        pins.forEach((pin) => {
-            pin.classList.toggle(
-                'is-active',
-                pin.dataset.cafeId === selectedId
-            )
-        })
-
-        listings.forEach((listing) => {
-            listing.classList.toggle(
-                'is-map-active',
-                listing.dataset.cafeId === selectedId
-            )
-        })
-    }
-
-    // Highlight the corresponding map pin when a listing is hovered
-    // or receives keyboard focus.
+    // Hovering or focusing a listing activates its map pin.
     listings.forEach((listing) => {
-        const activateListing = () => {
-            activate(listing.dataset.cafeId)
+        const activate = () => {
+            activateMapCafe(listing.dataset.cafeId)
         }
 
-        listing.addEventListener(
-            'mouseenter',
-            activateListing
-        )
-
-        listing.addEventListener(
-            'focusin',
-            activateListing
-        )
+        listing.addEventListener('mouseenter', activate)
+        listing.addEventListener('focusin', activate)
     })
 
-    // Also highlight the corresponding listing when interacting
-    // with a map marker.
-    pins.forEach((pin) => {
-        const markerElement = pin.closest(
-            '.leaflet-marker-icon'
-        )
+    // Initially activate the first map pin.
+    const firstPin = document.querySelector(
+        '.map-pin[data-cafe-id]'
+    )
 
-        if (!markerElement) return
-
-        const activatePin = () => {
-            activate(pin.dataset.cafeId)
-        }
-
-        markerElement.addEventListener(
-            'mouseenter',
-            activatePin
-        )
-
-        markerElement.addEventListener(
-            'focusin',
-            activatePin
-        )
-
-        markerElement.addEventListener(
-            'click',
-            activatePin
-        )
-    })
-
-    // Initially highlight the first marker.
-    activate(pins[0].dataset.cafeId)
+    if (firstPin) {
+        activateMapCafe(firstPin.dataset.cafeId)
+    }
 }
 
 
@@ -1004,7 +1008,13 @@ const initLocationPicker = () => {
                 } else {
                     marker = L.marker(
                         event.latlng,
-                        {draggable: true}
+                        {
+                            icon: createMapPinIcon({
+                                label: '1',
+                                active: false,
+                            }),
+                            draggable: true,
+                        }
                     ).addTo(map)
 
                     marker.on('dragend', () => {
@@ -1043,7 +1053,13 @@ const initLocationPicker = () => {
         } else {
             marker = L.marker(
                 markerPosition,
-                {draggable: true}
+                {
+                    icon: createMapPinIcon({
+                        label: '1',
+                        active: false,
+                    }),
+                    draggable: true,
+                }
             ).addTo(map)
 
             marker.on('dragend', () => {
@@ -1339,7 +1355,9 @@ const initResultsMap = () => {
     const mapPoints = []
 
     // Add one marker for each café.
+    // Add one marker for each café.
     validLocations.forEach((location, index) => {
+
         const latitude = Number(location.latitude)
         const longitude = Number(location.longitude)
         const cafeId = String(location.id)
@@ -1351,25 +1369,30 @@ const initResultsMap = () => {
 
         mapPoints.push(position)
 
-        // Build the marker using DOM elements rather than
-        // interpolating café names into HTML.
-        const pin = document.createElement('span')
+        const marker = L.marker(
+            position,
+            {
+                icon: createMapPinIcon({
+                    label: index + 1,
+                    cafeId: cafeId,
+                    active: index === 0,
+                }),
+            }
+        ).addTo(map)
 
-        pin.className = 'map-pin'
-        pin.dataset.cafeId = cafeId
-        pin.textContent = String(index + 1)
-
-        const icon = L.divIcon({
-            className: 'map-marker-wrapper',
-            html: pin,
-            iconSize: [28, 28],
-            iconAnchor: [14, 28],
+        // Synchronise the listing when interacting with its marker.
+        marker.on('mouseover', () => {
+            activateMapCafe(cafeId)
         })
 
-        const marker = L.marker([
-            location.latitude,
-            location.longitude
-        ]).addTo(map);
+        marker.on('click', () => {
+            activateMapCafe(cafeId)
+        })
+
+// Support keyboard navigation.
+        marker.getElement()?.addEventListener('focus', () => {
+            activateMapCafe(cafeId)
+        })
 
         // Safely display the café name in the popup.
         const popup = document.createElement('span')
@@ -1447,6 +1470,7 @@ onReady(() => {
     bindRange('ratingRange', 'ratingOut', (v) => Number(v).toFixed(1))
     initListingMap()
     initResultsMap()
+    initMapSync()
     initOpenDatepicker()
     initShareButton()
     initYear()

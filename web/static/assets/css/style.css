@@ -503,3 +503,17 @@
     }
 }
 
+/* ---------------------------------------------------------------
+   Leaflet map-pin integration
+   --------------------------------------------------------------- */
+
+.map-marker-wrapper {
+    background: transparent;
+    border: 0;
+}
+
+.map-marker-wrapper .map-pin {
+    position: relative;
+    inset: auto;
+    transform: none;
+}
