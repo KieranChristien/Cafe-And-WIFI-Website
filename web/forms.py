@@ -6,10 +6,11 @@ from flask_wtf import FlaskForm
 from flask_wtf.file import FileAllowed, FileSize, FileRequired
 from phonenumbers import NumberParseException
 from typing import Literal, NewType, Sequence
-from wtforms import IntegerField, SelectField
+from wtforms import BooleanField, FieldList, Form, FormField, IntegerField, SelectField, TimeField
 from wtforms.fields.simple import StringField, TextAreaField, SubmitField
-from wtforms.validators import DataRequired, Email, InputRequired, Length, NumberRange, Optional, URL, ValidationError, \
-    Regexp
+from wtforms.validators import (DataRequired, Email, InputRequired, Length, NumberRange, Optional, Regexp, URL,
+                                ValidationError)
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError, available_timezones
 
 # ------------------------------------------------------------------------------------------------------
 # Field Lengths
@@ -430,6 +431,63 @@ def password_render_kw(required: bool = False, required_message: str | None = No
 
 
 # ------------------------------------------------------------------------------------------------------
+# TIME ZONE VALIDATION
+# ------------------------------------------------------------------------------------------------------
+TIMEZONE_REQUIRED = "Please select a time zone."
+TIMEZONE_INVALID = "Please select a valid time zone."
+
+# Use IANA time zone identifiers as both the stored values and labels.
+TIMEZONE_NAMES = frozenset(available_timezones())
+
+TIMEZONE_CHOICES = [
+    ("", "Select a time zone"),
+    *[
+        (name, name)
+        for name in sorted(TIMEZONE_NAMES, key=str.casefold)
+    ],
+]
+
+
+def validate_timezone(form, field) -> None:
+    """Validate that the selected value is a supported IANA time zone."""
+
+    name = field.data
+
+    if not isinstance(name, str) or name not in TIMEZONE_NAMES:
+        raise ValidationError(TIMEZONE_INVALID)
+
+    try:
+        ZoneInfo(name)
+
+    except (ZoneInfoNotFoundError, ValueError, TypeError) as exc:
+        raise ValidationError(TIMEZONE_INVALID) from exc
+
+
+def timezone_validators(required: bool = False) -> list:
+    validators: list = (
+        required_validators(DataRequired, TIMEZONE_REQUIRED)
+        if required
+        else [Optional()]
+    )
+
+    validators.append(validate_timezone)
+
+    return validators
+
+
+def timezone_render_kw(required: bool = False) -> dict:
+    render_kw: dict = (
+        required_render_kw(TIMEZONE_REQUIRED)
+        if required
+        else {}
+    )
+
+    render_kw["data-msg-invalid-choice"] = TIMEZONE_INVALID
+
+    return render_kw
+
+
+# ------------------------------------------------------------------------------------------------------
 # FILE VALIDATION
 # ------------------------------------------------------------------------------------------------------
 BYTES_PER_MB = 1024 * 1024
@@ -566,6 +624,58 @@ COUNTRY_CHOICES = [
 
 
 # ------------------------------------------------------------------------------------------------------
+# OPENING HOURS
+# ------------------------------------------------------------------------------------------------------
+def validate_opening_time(form, field) -> None:
+    if form.is_closed.data:
+        return
+
+    if field.data is None:
+        raise ValidationError(
+            "Enter an opening time or mark this day as closed."
+        )
+
+
+def validate_closing_time(form, field) -> None:
+    if form.is_closed.data:
+        return
+
+    if field.data is None:
+        raise ValidationError(
+            "Enter a closing time or mark this day as closed."
+        )
+
+    if field.data == form.opens_at.data:
+        raise ValidationError(
+            "Closing time must differ from opening time."
+        )
+
+
+class OpeningHoursDayForm(Form):
+    opens_at = TimeField(
+        "Opens",
+        format="%H:%M",
+        validators=[validate_opening_time],
+        render_kw={
+            "type": "time",
+            "step": 60,
+        },
+    )
+
+    closes_at = TimeField(
+        "Closes",
+        format="%H:%M",
+        validators=[validate_closing_time],
+        render_kw={
+            "type": "time",
+            "step": 60,
+        },
+    )
+
+    is_closed = BooleanField("Closed")
+
+
+# ------------------------------------------------------------------------------------------------------
 # FORMS
 # ------------------------------------------------------------------------------------------------------
 
@@ -604,6 +714,20 @@ class CafeForm(FlaskForm):
         validators=phone_validators(),
         render_kw=phone_render_kw(),
         filters=[strip_string],
+    )
+
+    timezone = SelectField(
+        "Time Zone",
+        choices=TIMEZONE_CHOICES,
+        validators=timezone_validators(required=True),
+        render_kw=timezone_render_kw(required=True),
+        validate_choice=True,
+    )
+
+    opening_hours = FieldList(
+        FormField(OpeningHoursDayForm),
+        min_entries=7,
+        max_entries=7,
     )
 
     # img_url = StringField(

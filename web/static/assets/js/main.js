@@ -222,6 +222,14 @@ const bindRange = (rangeId, outId, format) => {
     sync()
 }
 
+const setInlineStatus = (element, state, message) => {
+    if (!element) return
+
+    element.dataset.state = state
+    element.textContent = message
+    element.hidden = !message
+}
+
 /* ---------------------------------------------------------------
    Shared Leaflet map-pin icon
    --------------------------------------------------------------- */
@@ -910,6 +918,120 @@ const initLocationPicker = () => {
 
     const mapZoomInput = document.getElementById('mapZoom')
 
+    const editForm = document.getElementById('editForm')
+
+    const timezoneInput = document.getElementById('timezone')
+
+    const timezoneStatus = document.getElementById('timezoneStatus')
+
+    const timezonePreviewUrl =
+        editForm?.dataset.timezonePreviewUrl
+
+    let timezoneController = null
+    let timezoneRequestId = 0
+
+
+    const lookupTimezone = async (latlng) => {
+
+        if (
+            !timezoneInput ||
+            !timezonePreviewUrl
+        ) {
+            return
+        }
+
+        // Cancel any previous lookup.
+        timezoneController?.abort()
+
+        const controller = new AbortController()
+
+        timezoneController = controller
+
+        const requestId = ++timezoneRequestId
+
+        const csrfToken = editForm.querySelector(
+            'input[name="csrf_token"]'
+        )?.value
+
+        timezoneInput.value = ''
+
+        setInlineStatus(
+            timezoneStatus,
+            'loading',
+            'Detecting time zone...'
+        )
+
+        try {
+
+            const response = await fetch(
+                timezonePreviewUrl,
+                {
+                    method: 'POST',
+
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type':
+                            'application/x-www-form-urlencoded;charset=UTF-8',
+
+                        ...(csrfToken
+                            ? {'X-CSRFToken': csrfToken}
+                            : {}),
+                    },
+
+                    body: new URLSearchParams({
+                        latitude: latlng.lat.toFixed(7),
+                        longitude: latlng.lng.toFixed(7),
+                    }),
+
+                    signal: controller.signal,
+                }
+            )
+
+            const result = await response.json()
+
+            if (!response.ok) {
+                throw new Error(
+                    result.error || 'Unable to determine time zone.'
+                )
+            }
+
+            // Ignore outdated responses.
+            if (requestId !== timezoneRequestId) {
+                return
+            }
+
+            timezoneInput.value = result.timezone
+
+            timezoneInput.dispatchEvent(
+                new Event('change', {bubbles: true})
+            )
+
+            setInlineStatus(
+                timezoneStatus,
+                'success',
+                'Time zone automatically detected from the map location.'
+            )
+
+        } catch (error) {
+
+            if (error.name === 'AbortError') {
+                return
+            }
+
+            if (requestId !== timezoneRequestId) {
+                return
+            }
+
+            setInlineStatus(
+                timezoneStatus,
+                'error',
+                error.message
+            )
+
+        }
+
+    }
+
     if (
         !addressForm ||
         !mapContainer ||
@@ -935,6 +1057,7 @@ const initLocationPicker = () => {
             `Latitude: ${latitudeInput.value}, ` +
             `Longitude: ${longitudeInput.value}`
 
+        lookupTimezone(latlng)
     }
 
     // --------------------------------------------------
@@ -953,8 +1076,8 @@ const initLocationPicker = () => {
 
 
     // --------------------------------------------------
-// Create or restore the map
-// --------------------------------------------------
+    // Create or restore the map
+    // --------------------------------------------------
 
     const initialiseMap = (
         latitude,
@@ -1082,14 +1205,27 @@ const initLocationPicker = () => {
         latitudeInput.value = ''
         longitudeInput.value = ''
 
+        timezoneController?.abort()
+        timezoneRequestId++
+
+        timezoneInput.value = ''
+
+        setInlineStatus(
+            timezoneStatus,
+            '',
+            ''
+        )
+        setInlineStatus(
+            status,
+            'info',
+            'Search for the updated address to select its location.'
+        )
+
         mapCenterLatitudeInput.value = ''
         mapCenterLongitudeInput.value = ''
         mapZoomInput.value = '18'
 
         mapContainer.hidden = true
-
-        status.textContent =
-            'Search for the updated address to select its location.'
     })
 
 
@@ -1107,7 +1243,11 @@ const initLocationPicker = () => {
             return
         }
 
-        status.textContent = 'Finding location...'
+        setInlineStatus(
+            status,
+            'loading',
+            'Searching for location...'
+        )
 
         button.disabled = true
 
@@ -1137,12 +1277,19 @@ const initLocationPicker = () => {
                 result.longitude
             )
 
-            status.textContent =
-                'Location found. Please select the café building.'
+            setInlineStatus(
+                status,
+                'success',
+                'Location found. Adjust the marker to the café entrance.'
+            )
 
         } catch (error) {
 
-            status.textContent = error.message
+            setInlineStatus(
+                status,
+                'error',
+                error.message
+            )
 
         } finally {
 
@@ -1533,12 +1680,54 @@ const initNearestSort = () => {
     })
 }
 
+const initOpeningHours = () => {
+
+    const container = document.getElementById('openingHours')
+
+    if (!container) return
+
+    container.querySelectorAll('[data-opening-hours-row]').forEach(row => {
+
+        const closedInput = row.querySelector('input[type="checkbox"]')
+
+        const timeInputs = row.querySelectorAll('input[type="time"]')
+
+        if (!closedInput) return
+
+        const sync = () => {
+
+            const closed = closedInput.checked
+
+            row.classList.toggle('is-closed', closed)
+
+            timeInputs.forEach(input => {
+
+                input.disabled = closed
+                input.required = !closed
+
+                if (closed) {
+                    input.value = ''
+                }
+
+            })
+
+        }
+
+        closedInput.addEventListener('change', sync)
+
+        sync()
+
+    })
+
+}
+
 
 onReady(() => {
     initBase()
     initFormValidation()
     initFeaturePicker()
     initLocationPicker()
+    initOpeningHours()
 
     bindRange('ratingRange', 'ratingOut', (v) => Number(v).toFixed(1))
     initListingMap()

@@ -235,15 +235,36 @@
                         {% endif %}
                     </div>
 
+                    {% set weekdays = [
+                    "Monday",
+                    "Tuesday",
+                    "Wednesday",
+                    "Thursday",
+                    "Friday",
+                    "Saturday",
+                    "Sunday"
+                    ] %}
+
                     <h2 class="fs-sm fw-semibold mb-3">Opening hours</h2>
                     <div class="mb-5">
-                        <div class="hours-row is-today"><span>Monday</span><span>08:00 &#8211; 18:00</span></div>
-                        <div class="hours-row"><span>Tuesday</span><span>08:00 &#8211; 18:00</span></div>
-                        <div class="hours-row"><span>Wednesday</span><span>08:00 &#8211; 18:00</span></div>
-                        <div class="hours-row"><span>Thursday</span><span>08:00 &#8211; 18:00</span></div>
-                        <div class="hours-row"><span>Friday</span><span>08:00 &#8211; 19:00</span></div>
-                        <div class="hours-row"><span>Saturday</span><span>09:00 &#8211; 19:00</span></div>
-                        <div class="hours-row"><span>Sunday</span><span class="fg-3">Closed</span></div>
+                        {% for day in cafe.opening_hours %}
+
+                        {% set weekday = weekdays[loop.index0] %}
+                        <div class="hours-row{% if day.weekday == today_weekday %} is-today{% endif %}">
+                            <span>
+                                {{ weekday }}
+                            </span>
+                            <span {% if day.is_closed %} class="fg-3" {% endif %}>
+                                {% if day.is_closed %}
+                                Closed
+                                {% else %}
+                                {{ day.opens_at.strftime('%H:%M') }}
+                                &#8211;
+                                {{ day.closes_at.strftime('%H:%M') }}
+                                {% endif %}
+                            </span>
+                        </div>
+                        {% endfor %}
                     </div>
 
                     <hr class="mb-5">

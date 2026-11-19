@@ -1,13 +1,16 @@
 import re
+from datetime import datetime
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from flask import Blueprint, flash, redirect, render_template, url_for, jsonify, request
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from web.extensions import db, limiter
 from web.forms import CafeAddressForm, CafeEditForm, CafeReviewForm
-from web.models import Cafe, CafeReview
+from web.models import Cafe, CafeOpeningHour, CafeReview
 from web.services.database import commit_session
-from web.services.geocoding import AddressNotFound, GeocodingUnavailable, geocode_rough_address, get_directions_url, \
-    reverse_geocode
+from web.services.geocoding import (AddressNotFound, GeocodingUnavailable, geocode_rough_address, get_directions_url,
+                                    reverse_geocode)
+from web.services.timezone import get_timezone_from_coordinates
 from web.utils import format_phone_number
 
 listing = Blueprint('listing', __name__)
@@ -204,6 +207,47 @@ def address_preview(cafe_id: int):
     return jsonify(location)
 
 
+@listing.route(
+    "/listing/timezone-preview",
+    methods=["POST"],
+)
+@limiter.limit("30 per minute", methods=["POST"])
+def timezone_preview():
+    """Determine the time zone for the submitted coordinates."""
+
+    try:
+        latitude = parse_coordinate(
+            request.form.get("latitude"),
+            minimum=Decimal("-90"),
+            maximum=Decimal("90"),
+        )
+
+        longitude = parse_coordinate(
+            request.form.get("longitude"),
+            minimum=Decimal("-180"),
+            maximum=Decimal("180"),
+        )
+
+    except ValueError:
+        return jsonify({
+            "error": "Please provide valid coordinates.",
+        }), 400
+
+    timezone_name = get_timezone_from_coordinates(
+        latitude=float(latitude),
+        longitude=float(longitude),
+    )
+
+    if timezone_name is None:
+        return jsonify({
+            "error": "Could not determine the time zone for this location.",
+        }), 422
+
+    return jsonify({
+        "timezone": timezone_name,
+    })
+
+
 @listing.route('/listing/<int:cafe_id>/edit', methods=['GET', 'POST'])
 @limiter.limit("5 per minute", methods=["POST"])
 def edit(cafe_id: int):
@@ -213,7 +257,7 @@ def edit(cafe_id: int):
         flash("Cafe not found.", "error")
         return redirect(url_for("main.home"))
 
-    edit_form = CafeEditForm()
+    edit_form = CafeEditForm(obj=cafe)
     address_form = CafeAddressForm()
 
     if edit_form.validate_on_submit():
@@ -305,10 +349,56 @@ def edit(cafe_id: int):
             "latitude": latitude,
             "longitude": longitude,
 
+            "timezone": (edit_form.timezone.data or "").strip() or None,
+
             # Geocoding metadata
             "location_provider": address["provider"],
             "location_provider_id": address["provider_id"],
         }
+
+        # --------------------------------------------------
+        # Build opening-hours updates
+        # --------------------------------------------------
+
+        hours_by_weekday = {
+            hour.weekday: hour
+            for hour in cafe.opening_hours
+        }
+
+        opening_hours_changed = False
+
+        for weekday, entry in enumerate(edit_form.opening_hours.entries):
+
+            day_form = entry.form
+
+            # Closed days have no opening or closing times.
+            opens_at = None if day_form.is_closed.data else day_form.opens_at.data
+            closes_at = None if day_form.is_closed.data else day_form.closes_at.data
+
+            existing_hours = hours_by_weekday.get(weekday)
+
+            if existing_hours is None:
+
+                # Create a missing weekday record.
+                existing_hours = CafeOpeningHour(
+                    weekday=weekday,
+                    opens_at=opens_at,
+                    closes_at=closes_at,
+                )
+
+                cafe.opening_hours.append(existing_hours)
+
+                opening_hours_changed = True
+
+            elif (
+                    existing_hours.opens_at != opens_at
+                    or existing_hours.closes_at != closes_at
+            ):
+
+                existing_hours.opens_at = opens_at
+                existing_hours.closes_at = closes_at
+
+                opening_hours_changed = True
 
         # --------------------------------------------------
         # Apply only actual changes
@@ -323,20 +413,20 @@ def edit(cafe_id: int):
         for key, value in changed.items():
             setattr(cafe, key, value)
 
-        if changed and not commit_session(
-                success_message="Cafe updated successfully!",
-                error_message="Unable to update the cafe. Please try again.",
-                integrity_error_message="The submitted cafe information conflicts with existing data.",
-                debug_message=f"Failed to update cafe ID {cafe_id}.",
-                integrity_debug_message=f"Integrity violation updating cafe ID {cafe_id}.",
-        ):
-            return render_template(
-                "./listing/edit.html",
-                cafe=cafe,
-                edit_form=edit_form,
-                address_form=address_form,
-                website_title=cafe.name,
-            )
+        if changed or opening_hours_changed:
+
+            if not commit_session(
+                    success_message="Cafe updated successfully!",
+                    error_message="Unable to update the cafe. Please try again.",
+                    integrity_error_message="The submitted cafe information conflicts with existing data.",
+                    debug_message=f"Failed to update cafe ID {cafe_id}.",
+                    integrity_debug_message=f"Integrity violation updating cafe ID {cafe_id}.",
+            ):
+                return _render_edit_page(
+                    cafe,
+                    edit_form,
+                    address_form,
+                )
 
         return redirect(
             url_for("listing.view", cafe_id=cafe_id)
@@ -410,12 +500,21 @@ def view(cafe_id: int):
             303,
         )
 
+    today_weekday = None
+
+    if cafe.timezone:
+        try:
+            today_weekday = datetime.now(ZoneInfo(cafe.timezone)).weekday()
+        except (ZoneInfoNotFoundError, ValueError):
+            pass
+
     return render_template(
         "./listing/view.html",
         cafe=cafe,
         form=form,
         address=address,
         phone_number=phone_number,
+        today_weekday=today_weekday,
         website_title=cafe.name,
     )
 

@@ -519,3 +519,162 @@
     inset: auto;
     transform: none;
 }
+
+/* ---------------------------------------------------------------
+   Inline interaction statuses
+   --------------------------------------------------------------- */
+
+.inline-status {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.55rem;
+
+    margin-block-start: 0.65rem;
+
+    font-size: 0.8125rem;
+    line-height: 1.45;
+
+    color: var(--bs-fg-3);
+}
+
+.inline-status[hidden] {
+    display: none;
+}
+
+.inline-status::before {
+    content: "";
+
+    flex: 0 0 auto;
+
+    width: 0.5rem;
+    height: 0.5rem;
+
+    margin-block-start: 0.3rem;
+
+    border-radius: 50%;
+    background: currentColor;
+}
+
+/* Success */
+
+.inline-status[data-state="success"] {
+    color: #269b63;
+}
+
+.inline-status[data-state="success"]::before {
+    content: "✓";
+
+    width: auto;
+    height: auto;
+
+    margin: 0;
+
+    background: none;
+
+    font-weight: 700;
+}
+
+/* Error */
+
+.inline-status[data-state="error"] {
+    color: #e05252;
+}
+
+.inline-status[data-state="error"]::before {
+    content: "!";
+
+    width: auto;
+    height: auto;
+
+    margin: 0;
+
+    background: none;
+
+    font-weight: 700;
+}
+
+/* Loading */
+
+.inline-status[data-state="loading"]::before {
+    width: 0.75rem;
+    height: 0.75rem;
+
+    margin-block-start: 0.1rem;
+
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+
+    background: none;
+
+    animation: inline-status-spin 0.7s linear infinite;
+}
+
+@keyframes inline-status-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .inline-status[data-state="loading"]::before {
+        animation-duration: 1.5s;
+    }
+}
+
+
+/* ---------------------------------------------------------------
+   Opening hours editor
+   --------------------------------------------------------------- */
+
+.opening-hours__row {
+    display: grid;
+    grid-template-columns: 5rem minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.65rem;
+
+    padding-block: 0.65rem;
+
+    border-bottom: 1px solid var(--bs-border-color);
+}
+
+.opening-hours__day {
+    font-size: 0.8125rem;
+}
+
+.opening-hours__times {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.opening-hours__times input {
+    min-width: 0;
+}
+
+.opening-hours__closed {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+
+    white-space: nowrap;
+
+    font-size: 0.75rem;
+    cursor: pointer;
+}
+
+.opening-hours__row.is-closed .opening-hours__times {
+    opacity: 0.4;
+}
+
+@media (max-width: 420px) {
+    .opening-hours__row {
+        grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .opening-hours__times {
+        grid-column: 1 / -1;
+        grid-row: 2;
+    }
+}

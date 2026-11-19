@@ -1,5 +1,6 @@
 from decimal import Decimal
-from sqlalchemy import CheckConstraint, ForeignKey, Integer, Numeric, Select, String, func, select
+from sqlalchemy import (Boolean, CheckConstraint, ForeignKey, Integer, Numeric, Select, String, Time, UniqueConstraint,
+                        func, select)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from typing import Literal, Optional
 
@@ -129,11 +130,35 @@ class Cafe(db.Model):
         nullable=True
     )
 
+    timezone: Mapped[str] = mapped_column(
+        String(64),
+        nullable=True,
+    )
+
+    is_manually_closed: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default="false",
+    )
+
+    manual_closed_message: Mapped[str | None] = mapped_column(
+        String(250),
+        nullable=True,
+    )
+
     # Many-to-many relationship with CafeAttribute
     attributes: Mapped[list["CafeAttribute"]] = relationship(
         secondary=cafe_attributes,
         back_populates="cafes",
         order_by="CafeAttribute.id",
+    )
+
+    # One-to-many relationship with CafeReview
+    opening_hours: Mapped[list["CafeOpeningHour"]] = relationship(
+        back_populates="cafe",
+        cascade="all, delete-orphan",
+        order_by="CafeOpeningHour.weekday",
     )
 
     # One-to-many relationship with CafeReview
@@ -225,6 +250,7 @@ class Cafe(db.Model):
         }
 
         data["attributes"] = [cafe_attribute.to_dict() for cafe_attribute in self.attributes]
+        data["opening_hours"] = [opening_hour.to_dict() for opening_hour in self.opening_hours]
         data["reviews"] = [cafe_review.to_dict() for cafe_review in self.reviews]
 
         return data
@@ -261,10 +287,92 @@ class CafeAttribute(db.Model):
 
     def to_dict(self):
         return {
+            column.name: getattr(self, column.name)
+            for column in self.__table__.columns
+        }
+
+
+class CafeOpeningHour(db.Model):
+    __tablename__ = "cafe_opening_hour"
+
+    __table_args__ = (
+        CheckConstraint(
+            "weekday BETWEEN 0 AND 6",
+            name="ck_cafe_opening_hour_weekday"
+        ),
+        CheckConstraint(
+            """
+            (opens_at IS NULL AND closes_at IS NULL)
+            OR
+            (opens_at IS NOT NULL AND closes_at IS NOT NULL)
+            """,
+            name="ck_cafe_opening_hour_both_times_set",
+        ),
+        CheckConstraint(
+            "opens_at IS NULL OR opens_at <> closes_at",
+            name="ck_cafe_opening_hour_different_times",
+        ),
+        UniqueConstraint(
+            "cafe_id",
+            "weekday",
+            name="uq_cafe_opening_hour_cafe_weekday",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    cafe_id: Mapped[int] = mapped_column(
+        ForeignKey("cafe.id"),
+        nullable=False,
+        index=True,
+    )
+
+    # Monday = 0, Sunday = 6
+    weekday: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False
+    )
+
+    opens_at: Mapped[Time] = mapped_column(
+        Time,
+        nullable=True,
+    )
+
+    closes_at: Mapped[Time] = mapped_column(
+        Time,
+        nullable=True,
+    )
+
+    cafe: Mapped["Cafe"] = relationship(
+        back_populates="opening_hours",
+    )
+
+    @property
+    def is_closed(self):
+        return self.opens_at is None and self.closes_at is None
+
+    @property
+    def is_overnight(self) -> bool:
+        if self.is_closed:
+            return False
+
+        return self.closes_at < self.opens_at
+
+    def to_dict(self):
+        return {
             "id": self.id,
-            "name": self.name,
-            "slug": self.slug,
-            "category": self.category
+            "cafe_id": self.cafe_id,
+            "weekday": self.weekday,
+            "opens_at": (
+                self.opens_at.isoformat()
+                if self.opens_at else None
+            ),
+            "closes_at": (
+                self.closes_at.isoformat()
+                if self.closes_at else None
+            ),
+            "is_closed": self.is_closed,
+            "is_overnight": self.is_overnight,
         }
 
 
@@ -303,10 +411,8 @@ class CafeReview(db.Model):
 
     def to_dict(self):
         return {
-            "id": self.id,
-            "name": self.name,
-            "body": self.body,
-            "rating": self.rating,
+            column.name: getattr(self, column.name)
+            for column in self.__table__.columns
         }
 
 
