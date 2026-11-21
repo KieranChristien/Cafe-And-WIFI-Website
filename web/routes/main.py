@@ -4,7 +4,7 @@ from typing import Literal, cast
 
 from web.extensions import db
 from web.models import (Cafe, CafeAttribute, filter_by_attribute, get_attributes_from_slugs,
-                        get_review_stats, join_review_stats)
+                        get_review_stats, join_review_stats, filter_open_now)
 
 main = Blueprint('main', __name__)
 
@@ -95,7 +95,16 @@ def _get_filtered_cafes():
         stmt, average_rating, _ = join_review_stats(stmt)
         stmt = stmt.where(average_rating >= rating)
 
+    if _get_open_now_filter():
+        stmt = filter_open_now(stmt)
+
     return stmt
+
+
+def _get_open_now_filter() -> bool:
+    return request.args.get(
+        'open_now', ''
+    ).lower() in {'1', 'true', 'yes', 'on'}
 
 
 def _get_sort_by() -> SortTypes:
@@ -277,6 +286,7 @@ def home():
         "prices": selected_prices,
         "rating": selected_rating,
         "open_date": selected_open_date,
+        "open_now": _get_open_now_filter(),
     }
 
     return render_template(

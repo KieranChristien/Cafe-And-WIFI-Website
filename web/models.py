@@ -1,10 +1,11 @@
 from decimal import Decimal
 from sqlalchemy import (Boolean, CheckConstraint, ForeignKey, Integer, Numeric, Select, String, Time, UniqueConstraint,
-                        func, select)
+                        func, select, and_, or_, false)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from typing import Literal, Optional
 
 from web.extensions import db
+from web.services.clock import get_current_time, get_local_now
 
 AttributeCategory = Literal["amenity", "feature", "payment"]
 
@@ -130,7 +131,7 @@ class Cafe(db.Model):
         nullable=True
     )
 
-    timezone: Mapped[str] = mapped_column(
+    timezone: Mapped[str | None] = mapped_column(
         String(64),
         nullable=True,
     )
@@ -139,7 +140,7 @@ class Cafe(db.Model):
         Boolean,
         nullable=False,
         default=False,
-        server_default="false",
+        server_default=false(),
     )
 
     manual_closed_message: Mapped[str | None] = mapped_column(
@@ -333,12 +334,12 @@ class CafeOpeningHour(db.Model):
         nullable=False
     )
 
-    opens_at: Mapped[Time] = mapped_column(
+    opens_at: Mapped[Time | None] = mapped_column(
         Time,
         nullable=True,
     )
 
-    closes_at: Mapped[Time] = mapped_column(
+    closes_at: Mapped[Time | None] = mapped_column(
         Time,
         nullable=True,
     )
@@ -475,6 +476,98 @@ def filter_by_attribute(
     return stmt
 
 
+def filter_open_now(
+        stmt: Select[tuple[Cafe]],
+) -> Select[tuple[Cafe]]:
+    current_time = get_current_time()
+
+    # Retrieve only the distinct timezones belonging to
+    # cafés that have passed the other filters.
+    timezone_stmt = (
+        stmt.with_only_columns(
+            Cafe.timezone,
+            maintain_column_froms=True,
+        )
+        .order_by(None)
+        .distinct()
+    )
+
+    timezones = db.session.scalars(timezone_stmt).all()
+
+    timezone_conditions = []
+
+    for timezone_name in timezones:
+        local_now = get_local_now(current_time, timezone_name)
+
+        if local_now is None:
+            continue
+
+        local_clock = local_now.time().replace(tzinfo=None)
+
+        weekday = local_now.weekday()
+        yesterday = (weekday - 1) % 7
+
+        # Check today's opening hours.
+        today_open = Cafe.opening_hours.any(
+            and_(
+                CafeOpeningHour.weekday == weekday,
+
+                or_(
+                    # Normal opening hours.
+                    and_(
+                        CafeOpeningHour.opens_at
+                        < CafeOpeningHour.closes_at,
+
+                        CafeOpeningHour.opens_at <= local_clock,
+                        CafeOpeningHour.closes_at > local_clock,
+                    ),
+
+                    # Overnight opening hours.
+                    and_(
+                        CafeOpeningHour.opens_at
+                        > CafeOpeningHour.closes_at,
+
+                        CafeOpeningHour.opens_at <= local_clock,
+                    ),
+                ),
+            )
+        )
+
+        # Check whether yesterday's overnight schedule
+        # extends into today.
+        yesterday_open = Cafe.opening_hours.any(
+            and_(
+                CafeOpeningHour.weekday == yesterday,
+
+                CafeOpeningHour.opens_at
+                > CafeOpeningHour.closes_at,
+
+                CafeOpeningHour.closes_at > local_clock,
+            )
+        )
+
+        # Group the SQL conditions by timezone.
+        timezone_conditions.append(
+            and_(
+                Cafe.timezone == timezone_name,
+
+                Cafe.is_manually_closed.is_(False),
+
+                or_(
+                    today_open,
+                    yesterday_open,
+                ),
+            )
+        )
+
+    if not timezone_conditions:
+        return stmt.where(Cafe.id.in_([]))
+
+    return stmt.where(
+        or_(*timezone_conditions)
+    )
+
+
 def get_attributes_from_slugs(category: AttributeCategory, attribute_slugs: list[str]) -> list[CafeAttribute]:
     if not attribute_slugs:
         return []
@@ -533,7 +626,7 @@ def get_review_stats_subquery():
     )
 
 
-def join_review_stats(stmt):
+def join_review_stats(stmt: Select[tuple[Cafe]]):
     review_stats = get_review_stats_subquery()
 
     stmt = stmt.outerjoin(

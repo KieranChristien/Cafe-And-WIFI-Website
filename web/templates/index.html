@@ -103,6 +103,16 @@
 
                 <div class="filter-bar mb-5" id="filter-bar">
 
+                    {% if filters.open_now %}
+                    <span class="chip">
+                        Open now
+                        {{ dismiss_filter(
+                            'open_now',
+                            remove_filter_url('open_now')
+                        ) }}
+                    </span>
+                    {% endif %}
+
                     {% if filters.rating > 0 %}
                     <span class="chip">
                         {{ filters.rating }}★ and up
@@ -532,6 +542,22 @@
                             <path d="M4 4l8 8M12 4l-8 8"/>
                         </svg>
                     </button>
+                </div>
+            </div>
+
+            <div class="filter-drawer-group">
+                <h3 class="fs-sm fw-semibold mb-4">Availability</h3>
+
+                <div class="form-field mb-3">
+                    <input
+                            type="checkbox"
+                            class="check"
+                            id="openNow"
+                            name="open_now"
+                            value="1"
+                            {% if filters.open_now %}checked{% endif %}
+                    >
+                    <label for="openNow">Open now</label>
                 </div>
             </div>
 
