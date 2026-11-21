@@ -227,8 +227,34 @@
                                     <span class="chip">{{ attribute.name }}</span>
                                     {% endfor %}
                                 </div>
-                                <p class="listing-meta mb-0 mt-auto"><span class="closed-now">Closed</span> <span
-                                        aria-hidden="true">·</span> opens 18:30 <span aria-hidden="true">·</span> €€€
+                                <p class="listing-meta mb-0 mt-auto">
+                                    {% if cafe.operating_status == "open" %}
+                                    <span class="open-now">Open</span>
+                                    {% elif cafe.operating_status == "closed" %}
+                                    <span class="closed-now">Closed</span>
+                                    {% else %}
+                                    <span class="text-muted">Unknown</span>
+                                    {% endif %}
+                                    <span aria-hidden="true">
+                                        ·
+                                    </span>
+                                    {% if cafe.operating_status == "open" %}
+                                    <span>
+                                        Closes {{ cafe.next_closing_time.strftime("%H:%M") }}
+                                    </span>
+                                    {% elif cafe.next_opening_time %}
+                                    <span>
+                                        Opens {{ cafe.next_opening_time.strftime("%H:%M") }}
+                                    </span>
+                                    {% else %}
+                                    <span>
+                                        Opening time unavailable
+                                    </span>
+                                    {% endif %}
+                                    <span aria-hidden="true">
+                                        ·
+                                    </span>
+                                    €€€
                                 </p>
                             </div>
                         </article>

@@ -1,3 +1,4 @@
+from datetime import datetime
 from decimal import Decimal
 from sqlalchemy import (Boolean, CheckConstraint, ForeignKey, Integer, Numeric, Select, String, Time, UniqueConstraint,
                         func, select, and_, or_, false)
@@ -200,6 +201,22 @@ class Cafe(db.Model):
             .where(CafeReview.cafe_id == self.id)
         )
 
+    @property
+    def operating_status(self) -> str:
+        from web.services.opening_hours import get_operating_status
+
+        return get_operating_status(self)
+
+    @property
+    def next_opening_time(self) -> datetime | None:
+        from web.services.opening_hours import get_next_opening_time
+        return get_next_opening_time(self)
+
+    @property
+    def next_closing_time(self) -> datetime | None:
+        from web.services.opening_hours import get_next_closing_time
+        return get_next_closing_time(self)
+
     # Attribute management
 
     def add_attribute(self, attribute: "CafeAttribute") -> bool:
@@ -249,6 +266,14 @@ class Cafe(db.Model):
             column.name: getattr(self, column.name)
             for column in self.__table__.columns
         }
+
+        data["payments"] = self.payments
+        data["features"] = self.features
+        data["amenities"] = self.amenities
+        data["average_rating"] = self.average_rating
+        data["operating_status"] = self.operating_status
+        data["next_opening_time"] = self.next_opening_time
+        data["next_closing_time"] = self.next_closing_time
 
         data["attributes"] = [cafe_attribute.to_dict() for cafe_attribute in self.attributes]
         data["opening_hours"] = [opening_hour.to_dict() for opening_hour in self.opening_hours]

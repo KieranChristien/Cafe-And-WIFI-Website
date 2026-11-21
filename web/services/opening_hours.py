@@ -1,7 +1,8 @@
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from web.models import Cafe
+from web.services.clock import get_local_now, get_current_time
 
 
 def get_operating_status(
@@ -26,13 +27,11 @@ def get_operating_status(
 
     # Obtain the current UTC time.
     if current_time is None:
-        current_time = datetime.now(timezone.utc)
+        current_time = get_current_time()
 
     # Reject naive datetimes to prevent ambiguous comparisons.
     if current_time.tzinfo is None or current_time.utcoffset() is None:
-        raise ValueError(
-            "current_time must be timezone-aware"
-        )
+        return "unknown"
 
     # Convert to the cafe's local timezone.
     try:
@@ -40,9 +39,7 @@ def get_operating_status(
             ZoneInfo(cafe.timezone.__str__())
         )
     except (ZoneInfoNotFoundError, TypeError):
-        raise ValueError(
-            f"Invalid timezone: {cafe.timezone!r}"
-        )
+        return "unknown"
 
     current_clock = local_time.time().replace(tzinfo=None)
 
@@ -87,3 +84,93 @@ def get_operating_status(
             return "open"
 
     return "closed"
+
+
+def _get_opening_interval(cafe: Cafe, day, tz):
+    """Return the scheduled opening and closing datetimes for a day."""
+    hours = next(
+        (entry for entry in cafe.opening_hours
+         if entry.weekday == day.weekday()),
+        None,
+    )
+
+    if hours is None or hours.is_closed:
+        return None
+
+    opening = datetime.combine(
+        day, hours.opens_at
+    ).replace(tzinfo=tz)
+
+    closing_day = (
+        day + timedelta(days=1)
+        if hours.is_overnight
+        else day
+    )
+
+    closing = datetime.combine(
+        closing_day, hours.closes_at
+    ).replace(tzinfo=tz)
+
+    return opening, closing
+
+
+def get_next_opening_time(
+    cafe: Cafe,
+    current_time: datetime | None = None,
+) -> datetime | None:
+    """Return the next scheduled opening datetime."""
+
+    if cafe.is_manually_closed:
+        return None
+
+    current_time = current_time or get_current_time()
+    local_now = get_local_now(current_time, cafe.timezone.__str__())
+
+    if local_now is None:
+        return None
+
+    for offset in range(8):
+        day = local_now.date() + timedelta(days=offset)
+
+        interval = _get_opening_interval(
+            cafe, day, local_now.tzinfo
+        )
+
+        if interval is None:
+            continue
+
+        opening, _ = interval
+
+        if opening > local_now:
+            return opening
+
+    return None
+
+
+def get_next_closing_time(
+        cafe: Cafe,
+        current_time: datetime | None = None,
+) -> datetime | None:
+    """Return the next scheduled closing datetime."""
+    current_time = current_time or get_current_time()
+    local_now = get_local_now(current_time, cafe.timezone.__str__())
+
+    if local_now is None:
+        return None
+
+    # Include yesterday for overnight sessions already in progress.
+    for offset in range(-1, 8):
+        day = local_now.date() + timedelta(days=offset)
+        interval = _get_opening_interval(
+            cafe, day, local_now.tzinfo
+        )
+
+        if interval is None:
+            continue
+
+        _, closing = interval
+
+        if closing > local_now:
+            return closing
+
+    return None
