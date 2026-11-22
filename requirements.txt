@@ -6,6 +6,7 @@ flask_limiter
 Flask_Migrate
 flask_sqlalchemy
 flask_wtf
+nh3
 pycountry
 phonenumbers
 python-dotenv

@@ -702,12 +702,19 @@ class CafeAddressForm(FlaskForm):
 
 
 class CafeForm(FlaskForm):
-    # name = StringField(
-    #     "Cafe Name",
-    #     validators=string_validators(min_len=2, max_len=50, required=True),
-    #     render_kw=string_render_kw(min_len=2, max_len=50, required=True),
-    #     filters=[strip_string],
-    # )
+    name = StringField(
+        "Cafe Name",
+        validators=string_validators(min_len=2, max_len=50),
+        render_kw=string_render_kw(min_len=2, max_len=50),
+        filters=[strip_string],
+    )
+
+    overview = TextAreaField(
+        "Overview",
+        validators=string_validators(max_len=20_000),
+        render_kw=string_render_kw(max_len=20_000),
+        filters=[strip_string],
+    )
 
     phone_number = StringField(
         "Phone Number (Optional)",

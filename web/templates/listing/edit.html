@@ -13,8 +13,12 @@
                 <li class="breadcrumb-item"><a class="breadcrumb-link"
                                                href="{{ url_for('main.home') }}#results">Coffee</a></li>
                 <li class="breadcrumb-divider">/</li>
-                <li class="breadcrumb-item" aria-current="page"><a class="breadcrumb-link active" href="view.html">{{
-                    cafe.name }}</a></li>
+                <li class="breadcrumb-item" aria-current="page">
+                    <a class="breadcrumb-link active" href="view.html">
+                        {{
+                        cafe.name }}
+                    </a>
+                </li>
             </ol>
         </nav>
 
@@ -31,9 +35,11 @@
 
                 <div class="d-flex flex-wrap align-items-start gap-4 mb-5">
                     <div class="me-auto">
-                        <h1 class="fs-4xl fw-bold mb-3" style="letter-spacing:-.03em">
-                            {{ cafe.name }}
-                        </h1>
+                        {{ edit_form.name(
+                        form="editForm",
+                        class="form-ghost fs-4xl fw-bold mb-3",
+                        style="letter-spacing:-.03em",
+                        ) }}
                         <div class="listing-meta">
                                 <span class="rating">
                                     <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
@@ -89,24 +95,127 @@
                 </ul>
 
                 <div class="tab-content">
-                    <div class="tab-pane fade show active" id="ov" role="tabpanel" aria-labelledby="ov-tab"
+                    <div class="tab-pane fade show active"
+                         id="ov"
+                         role="tabpanel"
+                         aria-labelledby="ov-tab"
                          tabindex="0">
-                        <div class="prose" style="max-width:44rem">
-                            <p>Three seats, one grinder and a roaster in the back that has been running since 2011.
-                                Kasper roasts on Mondays, which is the day to come if you want to talk about it, and
-                                the
-                                day to avoid if you want somewhere quiet.</p>
-                            <p>The filter menu changes weekly and is written on a card by the till. There is no oat
-                                milk
-                                debate here — they have it, they will not comment on it.</p>
-                            <h3>Good to know</h3>
-                            <ul>
-                                <li>Cash only, there is an ATM two doors down</li>
-                                <li>No laptops after 11:00 on weekends</li>
-                                <li>Bags of the current roast are &#8364;14</li>
-                            </ul>
+
+                        <div class="overview-editor" style="max-width:44rem">
+
+                            <label
+                                    class="visually-hidden"
+                                    id="overviewEditorLabel"
+                                    for="overviewSource"
+                            >
+                                Overview
+                            </label>
+
+                            <div class="overview-editor__surface">
+
+                                {{ edit_form.overview(
+                                id="overviewSource",
+                                form="editForm",
+                                class="form-control",
+                                rows="12"
+                                ) }}
+
+                                <div id="overviewEditor" hidden></div>
+
+                            </div>
+
+                            <p class="fg-3 fs-xs mt-3">
+                                Describe the café, its atmosphere, and anything
+                                visitors should know.
+                            </p>
+
                         </div>
                     </div>
+                    <dialog id="overviewImportDialog"
+                            class="overview-import-dialog">
+
+                        <div class="overview-import-dialog__header">
+                            <div>
+                                <h2 class="fs-lg fw-semibold mb-1">Import HTML</h2>
+                                <p class="fg-3 fs-sm mb-0">
+                                    Paste HTML to create a formatted overview.
+                                </p>
+                            </div>
+
+                            <button type="button"
+                                    class="btn-plain"
+                                    data-import-close
+                                    aria-label="Close">
+                                &times;
+                            </button>
+                        </div>
+
+                        <div class="overview-import-dialog__body">
+
+                            <label for="overviewImportSource" class="form-label">
+                                HTML source
+                            </label>
+
+                            <textarea
+                                    id="overviewImportSource"
+                                    class="form-control overview-import-source"
+                                    rows="12"
+                                    placeholder="<p>Write your overview...</p>"
+                                    spellcheck="false"
+                            ></textarea>
+
+                            <div class="
+                                d-flex
+                                justify-content-between
+                                align-items-center
+                                mt-3
+                                gap-3"
+                            >
+
+                                <p class="fg-3 fs-xs mb-0">
+                                    Supported: headings, paragraphs, lists, links and formatting.
+                                </p>
+
+                                <button type="button"
+                                        id="overviewImportPreview"
+                                        class="btn-outline">
+                                    Preview
+                                </button>
+
+                            </div>
+
+                            <div id="overviewImportPreviewArea"
+                                 class="overview-import-preview mt-4"
+                                 hidden>
+
+                                <h3 class="fs-sm fw-semibold mb-3">Preview</h3>
+
+                                <div id="overviewImportPreviewContent"
+                                     class="prose">
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                        <div class="overview-import-dialog__footer">
+
+                            <button type="button"
+                                    class="btn-outline"
+                                    data-import-close>
+                                Cancel
+                            </button>
+
+                            <button type="button"
+                                    id="overviewImportConfirm"
+                                    class="btn-solid theme-primary"
+                                    disabled>
+                                Import into editor
+                            </button>
+
+                        </div>
+
+                    </dialog>
                     <div class="tab-pane fade" id="rv" role="tabpanel" aria-labelledby="rv-tab" tabindex="0">
                         <div class="vstack gap-5" style="max-width:44rem">
                             {% for review in cafe.reviews %}
