@@ -1888,6 +1888,242 @@ const initOpeningHours = () => {
 
 }
 
+function initOverviewEditor() {
+    const overviewSource = document.getElementById("overviewSource");
+    const overviewElement = document.getElementById("overviewEditor");
+
+    // Make sure both elements exist and the editor hasn't already been initialized.
+    if (
+        !overviewSource ||
+        !overviewElement ||
+        overviewElement.dataset.quillInitialized === "true"
+    ) {
+        return;
+    }
+
+    // Import dialog elements.
+    const importDialog = document.getElementById("overviewImportDialog");
+    const importSource = document.getElementById("overviewImportSource");
+    const previewButton = document.getElementById("overviewImportPreview");
+    const previewArea = document.getElementById("overviewImportPreviewArea");
+    const previewContent = document.getElementById("overviewImportPreviewContent");
+    const confirmButton = document.getElementById("overviewImportConfirm");
+
+    let importedDelta = null;
+    let previewQuill = null;
+
+    // Create the Quill editor.
+    overviewElement.hidden = false;
+
+    const quill = new Quill(overviewElement, {
+        theme: "snow",
+
+        formats: [
+            "header",
+            "bold",
+            "italic",
+            "underline",
+            "strike",
+            "list",
+            "indent",
+            "blockquote",
+            "link"
+        ],
+
+        modules: {
+            toolbar: {
+                container: [
+                    [{header: [2, 3, false]}],
+                    ["bold", "italic", "underline", "strike"],
+                    [{list: "ordered"}, {list: "bullet"}],
+                    ["blockquote", "link"],
+                    ["clean"],
+                    ["importHtml"]
+                ],
+
+                handlers: {
+                    importHtml: function () {
+                        if (importDialog && !importDialog.open) {
+                            importDialog.showModal();
+                        }
+                    }
+                }
+            },
+
+            history: {
+                delay: 1000,
+                maxStack: 100,
+                userOnly: true
+            }
+        }
+    });
+
+    quill.root.classList.add("prose")
+
+    quill.root.setAttribute(
+        "aria-labelledby",
+        "overviewEditorLabel"
+    );
+
+    overviewElement.dataset.quillInitialized = "true";
+
+    // Hide the original WTForms textarea.
+    overviewSource.hidden = true;
+
+    // Give the custom import button an icon and tooltip.
+    const importButton = quill
+        .getModule("toolbar")
+        .container
+        .querySelector(".ql-importHtml");
+
+    if (importButton) {
+        importButton.innerHTML = `
+            <svg
+                viewBox="0 0 18 18"
+                width="18"
+                height="18"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+            >
+                <path d="M9 12V3"></path>
+                <path d="M5.5 6.5 9 3l3.5 3.5"></path>
+                <path d="M3 11v4h12v-4"></path>
+            </svg>
+        `;
+
+        importButton.type = "button";
+        importButton.title = "Import HTML";
+        importButton.setAttribute("aria-label", "Import HTML");
+    }
+
+    // Load existing HTML into the editor, if present.
+    if (overviewSource.value.trim()) {
+        const initialDelta = quill.clipboard.convert({
+            html: overviewSource.value,
+            text: ""
+        });
+
+        quill.setContents(initialDelta, "silent");
+    }
+
+    // Keep the original textarea synchronized with the editor.
+    function syncOverviewSource() {
+        overviewSource.value = quill.getSemanticHTML();
+    }
+
+    quill.on("text-change", syncOverviewSource);
+
+    // Set up the HTML import dialog.
+    if (
+        importDialog &&
+        importSource &&
+        previewButton &&
+        previewArea &&
+        previewContent &&
+        confirmButton
+    ) {
+        // Create a separate, read-only Quill editor for the preview.
+        previewQuill = new Quill(previewContent, {
+            theme: "snow",
+            readOnly: true,
+            modules: {
+                toolbar: false
+            }
+        });
+
+        previewQuill.root.classList.add("prose");
+
+        previewQuill.enable(false);
+
+        // Close dialog buttons.
+        importDialog.querySelectorAll("[data-import-close]").forEach(button => {
+            button.addEventListener("click", () => {
+                importDialog.close();
+            });
+        });
+
+        // Close the dialog when clicking its backdrop.
+        importDialog.addEventListener("click", event => {
+            if (event.target === importDialog) {
+                importDialog.close();
+            }
+        });
+
+        // Reset the preview whenever the HTML source changes.
+        importSource.addEventListener("input", () => {
+            importedDelta = null;
+            confirmButton.disabled = true;
+            previewArea.hidden = true;
+        });
+
+        // Convert and preview the supplied HTML.
+        previewButton.addEventListener("click", () => {
+            const html = importSource.value.trim();
+
+            if (!html) {
+                importedDelta = null;
+                confirmButton.disabled = true;
+                previewArea.hidden = true;
+                return;
+            }
+
+            try {
+                const delta = quill.clipboard.convert({
+                    html: html,
+                    text: ""
+                });
+
+                previewQuill.setContents(delta, "silent");
+
+                importedDelta = delta;
+                previewArea.hidden = false;
+                confirmButton.disabled = false;
+
+            } catch (error) {
+                console.error("HTML import preview failed:", error);
+
+                importedDelta = null;
+                confirmButton.disabled = true;
+                previewArea.hidden = true;
+            }
+        });
+
+        // Import the previewed HTML into the main editor.
+        confirmButton.addEventListener("click", () => {
+            if (!importedDelta) {
+                return;
+            }
+
+            quill.setContents(importedDelta, "user");
+
+            syncOverviewSource();
+
+            importDialog.close();
+
+            // Clear the import dialog for the next use.
+            importSource.value = "";
+            importedDelta = null;
+            confirmButton.disabled = true;
+            previewArea.hidden = true;
+
+            // Return focus to the main editor.
+            quill.focus();
+        });
+    }
+
+    // Make sure the latest HTML is submitted with the form.
+    if (overviewSource.form) {
+        overviewSource.form.addEventListener("submit", () => {
+            syncOverviewSource();
+        });
+    }
+
+    return quill;
+}
+
 
 onReady(() => {
     initBase()
@@ -1895,6 +2131,8 @@ onReady(() => {
     initFeaturePicker()
     initLocationPicker()
     initOpeningHours()
+
+    initOverviewEditor()
 
     const ratingRangeWrapper = document
         .getElementById('ratingRange')

@@ -729,3 +729,353 @@
         flex-basis: 100%;
     }
 }
+
+
+/* ---------------------------------------------------------------
+   Overview Rich Text Editor
+   --------------------------------------------------------------- */
+
+/* Shared outer border around toolbar and editing area */
+.overview-editor__surface {
+    width: 100%;
+    border: 1px solid var(--bs-border-color);
+    border-radius: 0.75rem;
+    background: var(--bs-bg-body);
+    box-sizing: border-box;
+}
+
+.overview-editor {
+    max-width: 44rem;
+    margin-inline: auto;
+}
+
+/* Toolbar */
+.overview-editor__surface .ql-toolbar.ql-snow {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+
+    margin: 0;
+    border: 0;
+    border-bottom: 1px solid var(--bs-border-color);
+
+    border-radius: 0.75rem 0.75rem 0 0;
+    background: var(--bs-bg-2);
+}
+
+/* Editing container */
+.overview-editor__surface .ql-container.ql-snow {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+
+    margin: 0;
+    border: 0;
+
+    border-radius: 0 0 0.75rem 0.75rem;
+    background: transparent;
+
+    font: inherit;
+}
+
+/* Actual editable content — replicate Bootstrap 6 .prose. */
+.ql-editor.prose {
+    --bs-content-font-size: 1rem;
+    --bs-content-line-height: 1.5;
+    --bs-content-gap: calc(
+            var(--bs-content-font-size) * var(--bs-content-line-height)
+    );
+
+    min-height: 18rem;
+    padding: 1.5rem;
+
+    color: var(--bs-fg-body);
+    caret-color: var(--bs-fg-body);
+
+    display: flex;
+    flex-direction: column;
+    gap: var(--bs-content-gap);
+
+    font-size: var(--bs-content-font-size);
+    line-height: var(--bs-content-line-height);
+
+    max-width: none;
+    margin: 0;
+}
+
+/* Bootstrap changes prose line-height at desktop widths. */
+@media (width >= 1024px) {
+    .ql-editor.prose {
+        --bs-content-font-size: var(--bs-font-size-md);
+        --bs-content-line-height: 1.625;
+    }
+}
+
+/* Match Bootstrap's block spacing. */
+.ql-editor.prose > :where(
+    p, ul, ol, dl, pre, table, blockquote
+) {
+    margin-block: 0;
+}
+
+/* Match Bootstrap's heading spacing and weight. */
+.ql-editor.prose > :where(
+    h1, h2, h3, h4, h5, h6
+) {
+    margin-top: 0;
+    margin-bottom: calc(var(--bs-content-gap) / -2);
+    font-weight: 500;
+    line-height: 1.25;
+}
+
+/* Heading spacing when they follow another content block. */
+.ql-editor.prose > :where(h1, h2):not(:first-child) {
+    margin-top: calc(var(--bs-content-gap) * 0.75);
+}
+
+.ql-editor.prose > :where(h3, h4, h5, h6):not(:first-child) {
+    margin-top: calc(var(--bs-content-gap) * 0.5);
+}
+
+/* Match Bootstrap's heading scale. */
+.ql-editor.prose > h1 {
+    font-size: 2.25em;
+    line-height: 1.1;
+}
+
+.ql-editor.prose > h2 {
+    font-size: 1.75em;
+}
+
+.ql-editor.prose > h3 {
+    font-size: 1.5em;
+}
+
+.ql-editor.prose > h4 {
+    font-size: 1.25em;
+}
+
+.ql-editor.prose > h5 {
+    font-size: 1.125em;
+}
+
+.ql-editor.prose > h6 {
+    font-size: 1em;
+}
+
+/* Placeholder */
+.overview-editor__surface .ql-editor.ql-blank::before {
+    color: var(--bs-fg-3);
+    font-style: normal;
+}
+
+
+/* ---------------------------------------------------------------
+   Toolbar Icons
+   --------------------------------------------------------------- */
+
+/* Default icon colours */
+.overview-editor__surface .ql-snow .ql-stroke {
+    stroke: var(--bs-fg-1);
+}
+
+.overview-editor__surface .ql-snow .ql-fill {
+    fill: var(--bs-fg-1);
+}
+
+/* Hover and active icons */
+.overview-editor__surface .ql-snow .ql-picker-label:hover,
+.overview-editor__surface .ql-snow button:hover,
+.overview-editor__surface .ql-snow button.ql-active,
+.overview-editor__surface .ql-snow .ql-picker-label.ql-active {
+    color: var(--bs-primary-base);
+}
+
+.overview-editor__surface .ql-snow button:hover .ql-stroke,
+.overview-editor__surface .ql-snow button.ql-active .ql-stroke,
+.overview-editor__surface .ql-snow .ql-picker-label:hover .ql-stroke,
+.overview-editor__surface .ql-snow .ql-picker-label.ql-active .ql-stroke {
+    stroke: var(--bs-primary-base);
+}
+
+.overview-editor__surface .ql-snow button:hover .ql-fill,
+.overview-editor__surface .ql-snow button.ql-active .ql-fill {
+    fill: var(--bs-primary-base);
+}
+
+
+/* ---------------------------------------------------------------
+   Dropdown Menus
+   --------------------------------------------------------------- */
+
+.overview-editor__surface .ql-snow .ql-picker {
+    color: var(--bs-fg-body);
+}
+
+.overview-editor__surface .ql-snow .ql-picker-options {
+    background: var(--bs-bg-body);
+    border: 1px solid var(--bs-border-color);
+    border-radius: 0.5rem;
+    box-shadow: 0 0.5rem 1.5rem rgb(0 0 0 / 18%);
+}
+
+.overview-editor__surface .ql-snow .ql-picker-item {
+    color: var(--bs-fg-body);
+}
+
+.overview-editor__surface .ql-snow .ql-picker-item:hover,
+.overview-editor__surface .ql-snow .ql-picker-item.ql-selected {
+    color: var(--bs-primary-base);
+}
+
+
+/* ---------------------------------------------------------------
+   Link Editing Tooltip
+   --------------------------------------------------------------- */
+
+.overview-editor__surface .ql-snow .ql-tooltip {
+    z-index: 10;
+
+    color: var(--bs-fg-body);
+    background: var(--bs-bg-body);
+
+    border: 1px solid var(--bs-border-color);
+    border-radius: 0.5rem;
+
+    box-shadow: 0 0.5rem 1.5rem rgb(0 0 0 / 18%);
+}
+
+.overview-editor__surface .ql-snow .ql-tooltip input[type="text"] {
+    color: var(--bs-fg-body);
+    background: var(--bs-bg-1);
+
+    border: 1px solid var(--bs-border-color);
+    border-radius: 0.375rem;
+
+    outline: none;
+}
+
+.overview-editor__surface .ql-snow .ql-tooltip input[type="text"]:focus {
+    border-color: var(--bs-primary-base);
+}
+
+.overview-editor__surface .ql-snow .ql-tooltip a {
+    color: var(--bs-primary-base);
+}
+
+.overview-editor__surface .ql-snow .ql-tooltip a:hover {
+    color: var(--bs-primary-fg-emphasis);
+}
+
+/* Tooltip arrow */
+.overview-editor__surface .ql-snow .ql-tooltip::before {
+    color: var(--bs-fg-body);
+}
+
+
+/* ---------------------------------------------------------------
+   Overview HTML Import Dialog
+   --------------------------------------------------------------- */
+
+.overview-import-dialog {
+    width: min(44rem, calc(100% - 2rem));
+    max-height: min(85vh, 55rem);
+    padding: 0;
+
+    color: var(--bs-fg-body);
+    background: var(--bs-bg-body);
+
+    border: 1px solid var(--bs-border-color);
+    border-radius: 1rem;
+
+    box-shadow: 0 1.5rem 4rem rgb(0 0 0 / 25%);
+}
+
+.overview-import-dialog::backdrop {
+    background: rgb(0 0 0 / 55%);
+    backdrop-filter: blur(3px);
+}
+
+.overview-import-dialog__header,
+.overview-import-dialog__footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1.25rem 1.5rem;
+}
+
+.overview-import-dialog__header {
+    border-bottom: 1px solid var(--bs-border-color);
+}
+
+.overview-import-dialog__body {
+    padding: 1.5rem;
+    overflow-y: auto;
+}
+
+.overview-import-dialog__footer {
+    border-top: 1px solid var(--bs-border-color);
+    justify-content: flex-end;
+}
+
+.overview-import-source {
+    width: 100%;
+    min-height: 14rem;
+    font-family: monospace;
+    font-size: 0.8125rem;
+    line-height: 1.6;
+    resize: vertical;
+}
+
+.overview-import-preview {
+    padding: 1.25rem;
+    border: 1px solid var(--bs-border-color);
+    border-radius: 0.75rem;
+    background: var(--bs-bg-2);
+}
+
+.overview-import-preview .prose {
+    color: var(--bs-fg-body);
+}
+
+.overview-import-dialog .btn-plain {
+    color: var(--bs-fg-2);
+    font-size: 1.5rem;
+}
+
+.overview-import-dialog .btn-plain:hover {
+    color: var(--bs-fg-body);
+}
+
+.overview-import-dialog .form-control {
+    color: var(--bs-fg-body);
+    background: var(--bs-bg-2);
+    border-color: var(--bs-border-color);
+}
+
+.overview-import-dialog .form-control:focus {
+    border-color: var(--bs-primary-base);
+}
+
+/* Match Quill's flat list indentation to Bootstrap's nested lists. */
+.ql-editor.prose ol,
+.ql-editor.prose ul {
+    padding-inline-start: 0;
+}
+
+.ql-editor.prose li:not(.ql-direction-rtl) {
+    padding-inline-start: var(--bs-list-padding-x);
+}
+
+.ql-editor.prose li.ql-indent-1:not(.ql-direction-rtl) {
+    padding-inline-start: calc(2 * var(--bs-list-padding-x));
+}
+
+.ql-editor.prose li.ql-indent-2:not(.ql-direction-rtl) {
+    padding-inline-start: calc(3 * var(--bs-list-padding-x));
+}
+
+.ql-editor.prose li.ql-indent-3:not(.ql-direction-rtl) {
+    padding-inline-start: calc(4 * var(--bs-list-padding-x));
+}

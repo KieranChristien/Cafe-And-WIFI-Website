@@ -1,7 +1,7 @@
 from datetime import datetime, date, time
 from decimal import Decimal
 from sqlalchemy import (Boolean, CheckConstraint, ForeignKey, Integer, Numeric, Select, String, Time, UniqueConstraint,
-                        func, select, and_, or_, false)
+                        func, select, and_, or_, false, Text)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from typing import Literal, Optional
 
@@ -57,6 +57,11 @@ class Cafe(db.Model):
     name: Mapped[str] = mapped_column(
         String(250),
         nullable=False
+    )
+
+    overview: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
     )
 
     phone_number: Mapped[str | None] = mapped_column(

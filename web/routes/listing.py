@@ -10,6 +10,7 @@ from web.models import Cafe, CafeOpeningHour, CafeReview
 from web.services.database import commit_session
 from web.services.geocoding import (AddressNotFound, GeocodingUnavailable, geocode_rough_address, get_directions_url,
                                     reverse_geocode)
+from web.services.overview import sanitize_overview
 from web.services.timezone import get_timezone_from_coordinates
 from web.utils import format_phone_number
 
@@ -148,6 +149,8 @@ def _render_edit_page(
         edit_form=edit_form,
         address_form=address_form,
         website_title=cafe.name,
+
+        overview_html=sanitize_overview(edit_form.overview.data),
 
         selected_address_query=selected_address_query,
         selected_latitude=selected_latitude,
@@ -335,6 +338,8 @@ def edit(cafe_id: int):
         updates = {
 
             # General café information
+            "name": (edit_form.name.data or "").strip() or None,
+            "overview": sanitize_overview(edit_form.overview.data),
             "phone_number": (edit_form.phone_number.data or "").strip() or None,
 
             # Address
@@ -452,6 +457,9 @@ def view(cafe_id: int):
         flash('Cafe not found.', 'error')
         return redirect(url_for('main.home'))
 
+    overview_html = sanitize_overview(cafe.overview)
+    phone_number = format_phone_number(cafe.phone_number) if cafe.phone_number is not None else None
+
     address = {
         "line1": (
             f"{cafe.address_line_1}"
@@ -462,8 +470,6 @@ def view(cafe_id: int):
         "line2": f"{cafe.postal_code} {cafe.city}, {cafe.country}" if cafe.location_provider is not None else "",
         "directions": get_directions_url(cafe.latitude, cafe.longitude) if cafe.location_provider is not None else "#",
     }
-
-    phone_number = format_phone_number(cafe.phone_number) if cafe.phone_number is not None else None
 
     form = CafeReviewForm()
 
@@ -512,8 +518,9 @@ def view(cafe_id: int):
         "./listing/view.html",
         cafe=cafe,
         form=form,
-        address=address,
+        overview_html=overview_html,
         phone_number=phone_number,
+        address=address,
         today_weekday=today_weekday,
         website_title=cafe.name,
     )

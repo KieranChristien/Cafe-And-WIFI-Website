@@ -114,20 +114,22 @@
                 </ul>
 
                 <div class="tab-content">
-                    <div class="tab-pane fade show active" id="ov" role="tabpanel" aria-labelledby="ov-tab"
+                    <div class="tab-pane fade show active"
+                         id="ov"
+                         role="tabpanel"
+                         aria-labelledby="ov-tab"
                          tabindex="0">
+
                         <div class="prose" style="max-width:44rem">
-                            <p>Three seats, one grinder and a roaster in the back that has been running since 2011.
-                                Kasper roasts on Mondays, which is the day to come if you want to talk about it, and the
-                                day to avoid if you want somewhere quiet.</p>
-                            <p>The filter menu changes weekly and is written on a card by the till. There is no oat milk
-                                debate here — they have it, they will not comment on it.</p>
-                            <h3>Good to know</h3>
-                            <ul>
-                                <li>Cash only, there is an ATM two doors down</li>
-                                <li>No laptops after 11:00 on weekends</li>
-                                <li>Bags of the current roast are &#8364;14</li>
-                            </ul>
+
+                            {% if overview_html %}
+                            {{ overview_html | safe }}
+                            {% else %}
+                            <p class="fg-2">
+                                No overview has been added yet.
+                            </p>
+                            {% endif %}
+
                         </div>
                     </div>
                     <div class="tab-pane fade" id="rv" role="tabpanel" aria-labelledby="rv-tab" tabindex="0">
