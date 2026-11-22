@@ -43,6 +43,8 @@ const initDatepickerDialogFix = () => {
             dialog.append(popup)
         }
 
+        bindCalendarTabExit(instance, popup, input, dialog)
+
         const inputRect = input.getBoundingClientRect()
         const dialogRect = dialog.getBoundingClientRect()
 
@@ -114,6 +116,77 @@ const initDatepickerDialogFix = () => {
             instance.__dialogPositionFrame = null
             positionPopup(instance)
         })
+    }
+
+    const bindCalendarTabExit = (instance, popup, input, dialog) => {
+        if (instance.__dialogTabHandler?.popup === popup) return
+
+        // Remove a handler from an earlier popup, if one exists.
+        if (instance.__dialogTabHandler) {
+            const {popup: oldPopup, handler} = instance.__dialogTabHandler
+            oldPopup.removeEventListener('keydown', handler)
+        }
+
+        const getTabStops = () => {
+            const selector = [
+                'a[href]',
+                'button',
+                'input',
+                'select',
+                'textarea',
+                '[tabindex]'
+            ].join(',')
+
+            return [...popup.querySelectorAll(selector)].filter(element =>
+                element.tabIndex >= 0 &&
+                !element.hasAttribute('disabled') &&
+                element.getAttribute('aria-disabled') !== 'true' &&
+                element.getAttribute('aria-hidden') !== 'true' &&
+                element.getClientRects().length > 0
+            )
+        }
+
+        const handler = event => {
+            if (event.key !== 'Tab') return
+
+            const tabStops = getTabStops()
+            if (!tabStops.length) return
+
+            const first = tabStops[0]
+            const last = tabStops[tabStops.length - 1]
+            const active = document.activeElement
+
+            // Reverse Tab from the first calendar control returns to the date field.
+            if (event.shiftKey && active === first) {
+                event.preventDefault()
+                instance.hide()
+                input.focus()
+                return
+            }
+
+            // Forward Tab from the last calendar control continues through the form.
+            if (!event.shiftKey && active === last) {
+                const clearButton = dialog.querySelector('#clearOpenDate')
+                const openNowInput = dialog.querySelector('#openNow')
+
+                const next = clearButton && !clearButton.hidden
+                    ? clearButton
+                    : openNowInput
+
+                if (!next) return
+
+                event.preventDefault()
+                instance.hide()
+                next.focus()
+            }
+        }
+
+        popup.addEventListener('keydown', handler)
+
+        instance.__dialogTabHandler = {
+            popup,
+            handler
+        }
     }
 
     // Listen for scrolling anywhere inside the dialog.
@@ -200,6 +273,13 @@ const initDatepickerDialogFix = () => {
 
         if (this.__dialogPositionFrame != null) {
             cancelAnimationFrame(this.__dialogPositionFrame)
+        }
+
+        const tabHandler = this.__dialogTabHandler
+
+        if (tabHandler) {
+            tabHandler.popup.removeEventListener('keydown', tabHandler.handler)
+            this.__dialogTabHandler = null
         }
 
         return originalDispose.apply(this, args)
@@ -425,16 +505,20 @@ const parseInitialDate = (value) => {
     return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
 }
 
+
 const initOpenDatepicker = () => {
     const input = document.getElementById('openDate')
     if (!input) return
+
+    const openNowInput = document.getElementById('openNow')
+    const dateControl = document.getElementById('openDateControl')
+    const clearButton = document.getElementById('clearOpenDate')
 
     // Capture the server-provided date before initialising Bootstrap.
     const initialValue = input.value.trim()
     const initialDate = parseInitialDate(initialValue)
 
-    // Prevent Bootstrap from parsing the input and prematurely calling
-    // calendar.set() during input-mode initialisation.
+    // Prevent Bootstrap from prematurely parsing the input.
     input.value = ''
 
     const picker = Datepicker.getOrCreateInstance(input, {
@@ -447,20 +531,28 @@ const initOpenDatepicker = () => {
         }
     })
 
-    // Preserve an unrecognised value rather than silently discarding it.
+    // Preserve an unrecognised value.
     if (!initialDate && initialValue) {
         input.value = initialValue
     }
 
-    const clearButton = document.getElementById('clearOpenDate')
+    // --------------------------------------------------
+    // Clear button
+    // --------------------------------------------------
+
+    const syncClearButton = () => {
+        if (!clearButton) return
+
+        clearButton.hidden =
+            input.disabled || !input.value.trim()
+    }
 
     if (clearButton) {
-        const syncClearButton = () => {
-            clearButton.hidden = !input.value.trim()
-        }
 
-        input.addEventListener('change.bs.datepicker', syncClearButton)
-        syncClearButton()
+        input.addEventListener(
+            'change.bs.datepicker',
+            syncClearButton
+        )
 
         clearButton.addEventListener('click', (event) => {
             event.preventDefault()
@@ -468,12 +560,73 @@ const initOpenDatepicker = () => {
 
             picker.hide()
             picker.setSelectedDates([])
+            input.value = ''
 
-            input.dispatchEvent(new Event('input', {bubbles: true}))
-            input.dispatchEvent(new Event('change', {bubbles: true}))
+            input.dispatchEvent(
+                new Event('input', {bubbles: true})
+            )
+
+            input.dispatchEvent(
+                new Event('change', {bubbles: true})
+            )
 
             syncClearButton()
         })
+    }
+
+    // --------------------------------------------------
+    // Open now toggle
+    // --------------------------------------------------
+
+    const syncOpenNow = () => {
+
+        const openNow = openNowInput?.checked ?? false
+
+        if (openNow) {
+
+            // Close the calendar if it is currently open.
+            picker.hide()
+
+            // Clear the selected date from the datepicker.
+            picker.setSelectedDates([])
+
+            // Clear the actual input value.
+            input.value = ''
+
+            input.blur()
+
+        }
+
+        // Disable or enable the date selector.
+        input.disabled = openNow
+
+        // Update accessibility state.
+        input.setAttribute('aria-disabled', String(openNow))
+
+        // Update accessibility state.
+        input.setAttribute('aria-disabled', String(openNow))
+
+        // Update the visual disabled state.
+        dateControl?.classList.toggle(
+            'is-disabled',
+            openNow
+        )
+
+        // Hide or show the clear button.
+        syncClearButton()
+
+    }
+
+    if (openNowInput) {
+
+        openNowInput.addEventListener(
+            'change',
+            syncOpenNow
+        )
+
+        // Initialise the correct state on page load.
+        syncOpenNow()
+
     }
 }
 
@@ -799,10 +952,20 @@ const initFeaturePicker = () => {
     input.addEventListener('input', renderSuggestions)
     input.addEventListener('focus', renderSuggestions)
 
-    input.addEventListener('blur', event => {
-        if (!suggestions.contains(event.relatedTarget)) {
-            hideSuggestions()
+    picker.addEventListener('focusout', event => {
+
+        // Keep suggestions open while focus remains inside
+        // the feature picker.
+        if (
+            event.relatedTarget &&
+            picker.contains(event.relatedTarget)
+        ) {
+            return
         }
+
+        // Focus has moved outside the feature picker.
+        hideSuggestions()
+
     })
 
     // Prevent Bootstrap's paste handler from creating free-form chips.

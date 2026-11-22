@@ -336,9 +336,11 @@
                             aria-label="Map showing cafés on this results page"
                     ></div>
 
+                    <!-- @formatter:off -->
                     <script type="application/json" id="mapLocations">
                         {{ map_locations | tojson }}
                     </script>
+                    <!-- @formatter:on -->
 
                     <div class="p-4 bg-2">
                         <p class="fs-xs fg-3 mb-0">
@@ -525,65 +527,63 @@
             <div class="filter-drawer-group">
                 <h3 class="fs-sm fw-semibold mb-4">Open on</h3>
 
-                <div class="form-control form-adorn">
-                    <div class="form-adorn-icon">
-                        <svg width="16" height="16"
-                             viewBox="0 0 16 16"
-                             fill="none"
-                             stroke="currentColor"
-                             stroke-width="1.5"
-                             aria-hidden="true">
-                            <rect x="2" y="3.5" width="12" height="11" rx="1.5"/>
-                            <path d="M5 2v3M11 2v3M2 7h12"/>
-                        </svg>
+                <div class="opening-filter-controls">
+                    <div class="form-control form-adorn opening-filter-date">
+                        <div class="form-adorn-icon">
+                            <svg width="16" height="16"
+                                 viewBox="0 0 16 16"
+                                 fill="none"
+                                 stroke="currentColor"
+                                 stroke-width="1.5"
+                                 aria-hidden="true">
+                                <rect x="2" y="3.5" width="12" height="11" rx="1.5"/>
+                                <path d="M5 2v3M11 2v3M2 7h12"/>
+                            </svg>
+                        </div>
+
+                        <input
+                                type="text"
+                                class="form-ghost"
+                                id="openDate"
+                                name="open_date"
+                                data-bs-toggle="datepicker"
+                                autocomplete="off"
+                                readonly
+                                placeholder="Choose a date…"
+                                value="{{ filters['open_date'] }}"
+                        >
+
+                        <button
+                                type="button"
+                                class="btn-icon btn-sm datepicker-clear"
+                                id="clearOpenDate"
+                                aria-label="Clear selected date"
+                                title="Clear date"
+                                hidden
+                        >
+                            <svg width="16" height="16"
+                                 viewBox="0 0 16 16"
+                                 fill="none"
+                                 stroke="currentColor"
+                                 stroke-width="1.8"
+                                 stroke-linecap="round"
+                                 aria-hidden="true">
+                                <path d="M4 4l8 8M12 4l-8 8"/>
+                            </svg>
+                        </button>
                     </div>
 
-                    <input
-                            type="text"
-                            class="form-ghost"
-                            id="openDate"
-                            name="open_date"
-                            data-bs-toggle="datepicker"
-                            autocomplete="off"
-                            readonly
-                            placeholder="Choose a date…"
-                            value="{{ filters['open_date'] }}"
-                    >
-
-                    <button
-                            type="button"
-                            class="btn-icon btn-sm datepicker-clear"
-                            id="clearOpenDate"
-                            aria-label="Clear selected date"
-                            title="Clear date"
-                            hidden
-                    >
-                        <svg width="16" height="16"
-                             viewBox="0 0 16 16"
-                             fill="none"
-                             stroke="currentColor"
-                             stroke-width="1.8"
-                             stroke-linecap="round"
-                             aria-hidden="true">
-                            <path d="M4 4l8 8M12 4l-8 8"/>
-                        </svg>
-                    </button>
-                </div>
-            </div>
-
-            <div class="filter-drawer-group">
-                <h3 class="fs-sm fw-semibold mb-4">Availability</h3>
-
-                <div class="form-field mb-3">
-                    <input
-                            type="checkbox"
-                            class="check"
-                            id="openNow"
-                            name="open_now"
-                            value="1"
-                            {% if filters.open_now %}checked{% endif %}
-                    >
-                    <label for="openNow">Open now</label>
+                    <div class="opening-filter-now">
+                        <input
+                                type="checkbox"
+                                class="check"
+                                id="openNow"
+                                name="open_now"
+                                value="1"
+                                {% if filters.open_now %}checked{% endif %}
+                        >
+                        <label for="openNow">Open now</label>
+                    </div>
                 </div>
             </div>
 
@@ -622,12 +622,6 @@
                 </div>
                 {% endfor %}
             </div>
-
-            <input
-                    type="hidden"
-                    name="sort_by"
-                    value="{{ sort_by }}"
-            >
 
             <input type="hidden" name="sort_by" value="{{ sort_by }}">
 

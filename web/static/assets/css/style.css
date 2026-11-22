@@ -678,3 +678,54 @@
         grid-row: 2;
     }
 }
+
+
+/* Opening hours filter */
+
+.opening-filter-controls {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.opening-filter-date {
+    flex: 1 1 12rem;
+    min-width: 0;
+}
+
+.opening-filter-now {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex: 0 0 auto;
+    white-space: nowrap;
+}
+
+.opening-filter-now label {
+    margin: 0;
+    font-size: 0.875rem;
+    cursor: pointer;
+}
+
+/* Disabled date selector */
+
+.opening-filter-date.is-disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.opening-filter-date.is-disabled input {
+    cursor: not-allowed;
+}
+
+/* Small screens */
+
+@media (max-width: 360px) {
+    .opening-filter-controls {
+        flex-wrap: wrap;
+    }
+
+    .opening-filter-date {
+        flex-basis: 100%;
+    }
+}
