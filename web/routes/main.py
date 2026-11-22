@@ -91,7 +91,7 @@ def _get_filtered_cafes():
 
     rating = request.args.get('rating', None, type=float)
 
-    if rating is not None and 1 <= rating <= 5:
+    if rating is not None and 0 < rating <= 5:
         stmt, average_rating, _ = join_review_stats(stmt)
         stmt = stmt.where(average_rating >= rating)
 
@@ -276,7 +276,7 @@ def home():
     selected_prices = request.args.getlist('price')
 
     selected_rating = request.args.get('rating', None, type=float)
-    if selected_rating is not None and not 1 <= selected_rating <= 5:
+    if selected_rating is not None and not 0 < selected_rating <= 5:
         selected_rating = None
 
     selected_open_date = request.args.get('open_date', '')
