@@ -1,8 +1,8 @@
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta
 
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from web.models import Cafe
-from web.services.clock import get_local_now, get_current_time
+from web.services.clock import get_local_time, get_current_time
 
 
 def get_operating_status(
@@ -86,6 +86,42 @@ def get_operating_status(
     return "closed"
 
 
+def get_operating_status_on_date(
+        cafe: Cafe,
+        date: datetime,
+) -> str:
+    """
+    Determine whether a café is currently open.
+
+    Returns:
+        "open"
+        "closed"
+        "unknown"
+
+    current_time must be timezone-aware if provided.
+    If omitted, the current UTC time is used.
+    """
+
+    day = date.weekday()
+
+    # Manual closure always takes priority.
+    if cafe.is_manually_closed:
+        return "closed"
+
+    # Build a weekday lookup.
+    hours_by_day = {
+        entry.weekday: entry
+        for entry in cafe.opening_hours
+    }
+
+    opening_hour = hours_by_day.get(day, None)
+    if opening_hour is None:
+        return "unknown"
+
+
+    return "closed" if opening_hour.is_closed else "open"
+
+
 def _get_opening_interval(cafe: Cafe, day, tz):
     """Return the scheduled opening and closing datetimes for a day."""
     hours = next(
@@ -115,8 +151,8 @@ def _get_opening_interval(cafe: Cafe, day, tz):
 
 
 def get_next_opening_time(
-    cafe: Cafe,
-    current_time: datetime | None = None,
+        cafe: Cafe,
+        current_time: datetime | None = None,
 ) -> datetime | None:
     """Return the next scheduled opening datetime."""
 
@@ -124,7 +160,7 @@ def get_next_opening_time(
         return None
 
     current_time = current_time or get_current_time()
-    local_now = get_local_now(current_time, cafe.timezone.__str__())
+    local_now = get_local_time(current_time, cafe.timezone.__str__())
 
     if local_now is None:
         return None
@@ -153,7 +189,7 @@ def get_next_closing_time(
 ) -> datetime | None:
     """Return the next scheduled closing datetime."""
     current_time = current_time or get_current_time()
-    local_now = get_local_now(current_time, cafe.timezone.__str__())
+    local_now = get_local_time(current_time, cafe.timezone.__str__())
 
     if local_now is None:
         return None

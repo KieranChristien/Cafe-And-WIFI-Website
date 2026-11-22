@@ -1,10 +1,12 @@
 import math
-from flask import Blueprint, jsonify, render_template, request, url_for
+from datetime import datetime
+
+from flask import Blueprint, jsonify, render_template, request, url_for, abort
 from typing import Literal, cast
 
 from web.extensions import db
 from web.models import (Cafe, CafeAttribute, filter_by_attribute, get_attributes_from_slugs,
-                        get_review_stats, join_review_stats, filter_open_now)
+                        get_review_stats, join_review_stats, filter_open_now, filter_open_on_date)
 
 main = Blueprint('main', __name__)
 
@@ -77,34 +79,79 @@ def _apply_sort(
     return stmt.order_by(Cafe.id.asc())
 
 
-def _get_filtered_cafes():
+def _get_filtered_cafes(filters: dict):
     stmt = db.select(Cafe)
 
-    amenities = request.args.getlist('amenities')
-    payments = request.args.getlist('payments')
-    features = request.args.getlist('features')
+    # Every selected attribute must match.
+    stmt = filter_by_attribute(
+        stmt, filters['amenity_slugs'], 'amenity'
+    )
+    stmt = filter_by_attribute(
+        stmt, filters['payment_slugs'], 'payment'
+    )
+    stmt = filter_by_attribute(
+        stmt, filters['feature_slugs'], 'feature'
+    )
 
-    # Every selected amenity must match
-    stmt = filter_by_attribute(stmt, amenities, 'amenity')
-    stmt = filter_by_attribute(stmt, payments, 'payment')
-    stmt = filter_by_attribute(stmt, features, 'feature')
+    rating = filters['rating']
 
-    rating = request.args.get('rating', None, type=float)
-
-    if rating is not None and 0 < rating <= 5:
+    if rating is not None:
         stmt, average_rating, _ = join_review_stats(stmt)
         stmt = stmt.where(average_rating >= rating)
 
-    if _get_open_now_filter():
+    open_now = filters['open_now']
+
+    if open_now:
         stmt = filter_open_now(stmt)
+
+    elif not open_now and filters['parsed_open_date'] is not None:
+        stmt = filter_open_on_date(
+            stmt, filters['parsed_open_date']
+        )
 
     return stmt
 
 
-def _get_open_now_filter() -> bool:
-    return request.args.get(
-        'open_now', ''
-    ).lower() in {'1', 'true', 'yes', 'on'}
+def _get_filters() -> dict:
+    amenity_slugs = request.args.getlist('amenities')
+    payment_slugs = request.args.getlist('payments')
+    feature_slugs = request.args.getlist('features')
+
+    open_date = request.args.get('open_date', '').strip()
+
+    try:
+        parsed_open_date = (
+            datetime.strptime(open_date, "%d/%m/%Y").date()
+            if open_date else None
+        )
+    except ValueError:
+        abort(400, description="Invalid date format. Expected DD/MM/YYYY.")
+
+    return {
+        "applied": request.args.get('filters_applied', '').lower() in {'1', 'true', 'yes', 'on'},
+
+        # Resolved attributes for displaying selected filters.
+        "amenities": get_attributes_from_slugs('amenity', amenity_slugs),
+        "payments": get_attributes_from_slugs('payment', payment_slugs),
+        "features": get_attributes_from_slugs('feature', feature_slugs),
+
+        # Raw slugs for database filtering.
+        "amenity_slugs": amenity_slugs,
+        "payment_slugs": payment_slugs,
+        "feature_slugs": feature_slugs,
+
+        "prices": request.args.getlist('price'),
+
+        "rating": rating if (
+                (rating := request.args.get('rating', type=float)) is not None
+                and 0 < rating <= 5
+        ) else None,
+
+        "open_date": open_date,
+        "parsed_open_date": parsed_open_date,
+
+        "open_now": request.args.get('open_now', '').lower() in {'1', 'true', 'yes', 'on'},
+    }
 
 
 def _get_sort_by() -> SortTypes:
@@ -183,7 +230,9 @@ def home():
     sort_by = _get_sort_by()
     user_coordinates = _get_user_coordinates()
 
-    stmt = _get_filtered_cafes()
+    filters = _get_filters()
+
+    stmt = _get_filtered_cafes(filters)
     stmt = _apply_sort(
         stmt,
         sort_by,
@@ -255,43 +304,6 @@ def home():
         for feature in cafe_features
     ]
 
-    filters_applied = request.args.get('filters_applied', False, type=bool)
-    selected_amenity_slugs = request.args.getlist('amenities')
-    selected_payment_slugs = request.args.getlist('payments')
-    selected_feature_slugs = request.args.getlist('features')
-
-    # Resolve slugs into CafeAttribute instances.
-    selected_amenities = get_attributes_from_slugs(
-        'amenity', selected_amenity_slugs
-    )
-
-    selected_payments = get_attributes_from_slugs(
-        'payment', selected_payment_slugs
-    )
-
-    selected_features = get_attributes_from_slugs(
-        'feature', selected_feature_slugs
-    )
-
-    selected_prices = request.args.getlist('price')
-
-    selected_rating = request.args.get('rating', None, type=float)
-    if selected_rating is not None and not 0 < selected_rating <= 5:
-        selected_rating = None
-
-    selected_open_date = request.args.get('open_date', '')
-
-    filters = {
-        "applied": filters_applied,
-        "amenities": selected_amenities,
-        "payments": selected_payments,
-        "features": selected_features,
-        "prices": selected_prices,
-        "rating": selected_rating,
-        "open_date": selected_open_date,
-        "open_now": _get_open_now_filter(),
-    }
-
     return render_template(
         "index.html",
         cafes=cafes,
@@ -313,7 +325,7 @@ def home():
 
 @main.route('/cafes/count')
 def cafe_count():
-    stmt = _get_filtered_cafes()
+    stmt = _get_filtered_cafes(_get_filters())
 
     count = db.session.scalar(
         db.select(db.func.count()).select_from(stmt.subquery())

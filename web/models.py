@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, date, time
 from decimal import Decimal
 from sqlalchemy import (Boolean, CheckConstraint, ForeignKey, Integer, Numeric, Select, String, Time, UniqueConstraint,
                         func, select, and_, or_, false)
@@ -6,7 +6,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from typing import Literal, Optional
 
 from web.extensions import db
-from web.services.clock import get_current_time, get_local_now
+from web.services.clock import get_current_time, get_local_time
 
 AttributeCategory = Literal["amenity", "feature", "payment"]
 
@@ -374,7 +374,7 @@ class CafeOpeningHour(db.Model):
     )
 
     @property
-    def is_closed(self):
+    def is_closed(self) -> bool:
         return self.opens_at is None and self.closes_at is None
 
     @property
@@ -382,7 +382,7 @@ class CafeOpeningHour(db.Model):
         if self.is_closed:
             return False
 
-        return self.closes_at < self.opens_at
+        return bool(self.closes_at < self.opens_at)
 
     def to_dict(self):
         return {
@@ -522,7 +522,7 @@ def filter_open_now(
     timezone_conditions = []
 
     for timezone_name in timezones:
-        local_now = get_local_now(current_time, timezone_name)
+        local_now = get_local_time(current_time, timezone_name)
 
         if local_now is None:
             continue
@@ -590,6 +590,40 @@ def filter_open_now(
 
     return stmt.where(
         or_(*timezone_conditions)
+    )
+
+
+def filter_open_on_date(
+        stmt: Select[tuple[Cafe]],
+        day: date,
+) -> Select[tuple[Cafe]]:
+    weekday = day.weekday()
+    previous_weekday = (weekday - 1) % 7
+
+    # Check whether the cafe has opening hours today.
+    opens_today = Cafe.opening_hours.any(
+        and_(
+            CafeOpeningHour.weekday == weekday,
+            CafeOpeningHour.opens_at.is_not(None),
+        )
+    )
+
+    # Check whether yesterday's overnight hours
+    # extend into today.
+    overnight_from_yesterday = Cafe.opening_hours.any(
+        and_(
+            CafeOpeningHour.weekday == previous_weekday,
+            CafeOpeningHour.opens_at > CafeOpeningHour.closes_at,
+            CafeOpeningHour.closes_at > time.min,
+        )
+    )
+
+    return stmt.where(
+        Cafe.is_manually_closed.is_(False),
+        or_(
+            opens_today,
+            overnight_from_yesterday,
+        )
     )
 
 

@@ -111,8 +111,15 @@
                             remove_filter_url('open_now')
                         ) }}
                     </span>
+                    {% elif filters.open_date %}
+                    <span class="chip">
+                        {{ filters.open_date }}
+                        {{ dismiss_filter(
+                            'open_date',
+                            remove_filter_url('open_date')
+                        ) }}
+                    </span>
                     {% endif %}
-
                     {% if filters.rating %}
                     <span class="chip">
                         {{ filters.rating }}★ and up
@@ -715,6 +722,14 @@
         // Update when form controls change.
         form.addEventListener('input', updateFilterCount);
         form.addEventListener('change', updateFilterCount);
+
+        // Listen for Bootstrap's custom datepicker event.
+        const openDateInput = form.querySelector('#openDate');
+
+        openDateInput?.addEventListener(
+            'change.bs.datepicker',
+            updateFilterCount
+        );
 
         // Also detect dynamically added/removed feature chips.
         const chipValues = form.querySelector('[data-chip-values]');
