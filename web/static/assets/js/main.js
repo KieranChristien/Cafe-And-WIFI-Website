@@ -2,7 +2,7 @@
  * Locale — Bootstrap 6 directory template
  */
 
-import {Chips, Datepicker} from 'bootstrap'
+import {Chips, Datepicker, Range} from 'bootstrap'
 import {initBase, initYear, onReady} from './base.js'
 import {initFormValidation} from './form-validation.js'
 
@@ -290,13 +290,17 @@ const initDatepickerDialogFix = () => {
 
 initDatepickerDialogFix()
 
-const bindRange = (rangeId, outId, format) => {
+const bindRange = (rangeId, outId, format, zeroLabel = null) => {
     const range = document.getElementById(rangeId)
     const out = document.getElementById(outId)
     if (!range || !out) return
 
     const sync = () => {
-        out.textContent = format(range.value)
+        const value = Number(range.value);
+
+        out.textContent = value === 0 && zeroLabel !== null
+            ? zeroLabel
+            : format(value);
     }
     range.addEventListener('input', sync)
     sync()
@@ -1892,7 +1896,28 @@ onReady(() => {
     initLocationPicker()
     initOpeningHours()
 
-    bindRange('ratingRange', 'ratingOut', (v) => Number(v).toFixed(1))
+    const ratingRangeWrapper = document
+        .getElementById('ratingRange')
+        ?.closest('.form-range')
+
+    if (ratingRangeWrapper) {
+        // Replace the automatically-created instance with our configuration.
+        Range.getInstance(ratingRangeWrapper)?.dispose()
+
+        new Range(ratingRangeWrapper, {
+            bubble: true,
+            formatter: value => Number(value) === 0
+                ? 'Any'
+                : Number(value).toFixed(1)
+        })
+    }
+
+    bindRange(
+        'ratingRange',
+        'ratingOut',
+        (v) => Number(v).toFixed(1),
+        'Any rating'
+    )
     initListingMap()
     initResultsMap()
     initMapSync()

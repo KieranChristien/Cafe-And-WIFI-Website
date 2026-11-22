@@ -113,7 +113,7 @@
                     </span>
                     {% endif %}
 
-                    {% if filters.rating > 0 %}
+                    {% if filters.rating %}
                     <span class="chip">
                         {{ filters.rating }}★ and up
                         {{ dismiss_filter(
@@ -450,13 +450,21 @@
                             class="form-range-input"
                             id="ratingRange"
                             name="rating"
-                            min="1"
+                            min="0"
                             max="5"
                             step="0.5"
-                            value="{{ filters.rating if filters.applied else '4' }}"
+                            value="{{ filters.rating if filters.rating else '0' }}"
                             aria-label="Minimum rating">
                 </div>
-                <p class="fs-xs fg-3 mb-0"><strong class="fg-1" id="ratingOut">4.0</strong> stars and up</p>
+                <p class="fs-xs fg-3 mb-0">
+                    <strong class="fg-1" id="ratingOut">
+                        {% if filters.rating is not none %}
+                        {{ "%.1f"|format(filters.rating) }} stars and up
+                        {% else %}
+                        Any rating
+                        {% endif %}
+                    </strong>
+                </p>
             </div>
 
             <div class="filter-drawer-group">
@@ -525,7 +533,7 @@
             </div>
 
             <div class="filter-drawer-group">
-                <h3 class="fs-sm fw-semibold mb-4">Open on</h3>
+                <h3 class="fs-sm fw-semibold mb-4">Opening hours</h3>
 
                 <div class="opening-filter-controls">
                     <div class="form-control form-adorn opening-filter-date">
@@ -641,8 +649,7 @@
                     id="filterSubmitButton"
                     data-bs-dismiss="drawer"
             >
-                Show {{ pagination.total }}
-                {{ 'place' if pagination.total == 1 else 'places' }}
+                Show {{ pagination.total }} {{ 'place' if pagination.total == 1 else 'places' }}
             </button>
         </form>
     </div>
