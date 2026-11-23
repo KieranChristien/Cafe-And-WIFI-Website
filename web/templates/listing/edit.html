@@ -22,13 +22,66 @@
             </ol>
         </nav>
 
-        <div class="ph ph-16x9 detail-hero fs-2xl mb-7" style="max-height:380px">
+        <div
+                id="coverImageDropzone"
+                class="ph ph-16x9 detail-hero cover-image-editor fs-2xl mb-7"
+                style="max-height: 380px"
+        >
             <img
+                    id="coverPreview"
                     src="{{ cafe.img_url }}"
                     alt="{{ cafe.name }}"
                     loading="lazy"
             >
+
+            <label
+                    for="coverImageInput"
+                    class="cover-image-overlay"
+                    title="Change cover image"
+            >
+        <span class="cover-image-overlay__content">
+            <span class="cover-image-upload-icon" aria-hidden="true">
+                <svg
+                        viewBox="0 0 24 24"
+                        width="32"
+                        height="32"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.8"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                >
+                    <path d="M12 16V4m0 0 4 4m-4-4L8 8"/>
+                    <path d="M20 16.5v2A1.5 1.5 0 0 1 18.5 20h-13A1.5 1.5 0 0 1 4 18.5v-2"/>
+                </svg>
+            </span>
+
+            <span class="cover-image-overlay__copy">
+                <strong id="coverImageOverlayTitle">
+                    Change cover image
+                </strong>
+                <small id="coverImageOverlayHint">
+                    Choose a file or drag it here
+                </small>
+            </span>
+        </span>
+            </label>
+
+            {{ edit_form.image(
+            id="coverImageInput",
+            form="editForm",
+            class="visually-hidden",
+            accept="image/jpeg,image/png,image/webp,image/gif"
+            ) }}
         </div>
+
+        <div
+                id="coverImageStatus"
+                class="cover-image-status mb-4"
+                role="status"
+                aria-live="polite"
+                hidden
+        ></div>
 
         <div class="row g-7">
             <div class="lg:col-8">
@@ -358,6 +411,7 @@
                     <form
                             id="editForm"
                             method="POST"
+                            enctype="multipart/form-data"
                             action="{{ url_for('listing.edit', cafe_id=cafe.id) }}"
                             data-timezone-preview-url="{{ url_for('listing.timezone_preview') }}"
                             data-bs-validate

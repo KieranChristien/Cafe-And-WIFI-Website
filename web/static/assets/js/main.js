@@ -2124,6 +2124,188 @@ function initOverviewEditor() {
     return quill;
 }
 
+// --------------------------------------------------
+// Cover image editor
+// --------------------------------------------------
+
+function initCoverImageUpload() {
+    const dropzone = document.getElementById("coverImageDropzone");
+    const input = document.getElementById("coverImageInput");
+    const preview = document.getElementById("coverPreview");
+    const status = document.getElementById("coverImageStatus");
+
+    const overlayTitle = document.getElementById("coverImageOverlayTitle");
+    const overlayHint = document.getElementById("coverImageOverlayHint");
+
+    if (!dropzone || !input || !preview || !status) return;
+
+    const originalImage = preview.src;
+    const maxSize = 5 * 1024 * 1024;
+
+    const allowedTypes = [
+        "image/jpeg",
+        "image/png",
+        "image/webp",
+        "image/gif",
+    ];
+
+    let previewUrl = null;
+    let dragDepth = 0;
+
+    function setStatus(message, state = "success") {
+        status.textContent = message;
+        status.dataset.state = state;
+        status.hidden = !message;
+    }
+
+    function revokePreview() {
+        if (previewUrl) {
+            URL.revokeObjectURL(previewUrl);
+            previewUrl = null;
+        }
+    }
+
+    function resetPreview() {
+        revokePreview();
+        preview.src = originalImage;
+    }
+
+    function isValidFile(file) {
+        if (!allowedTypes.includes(file.type)) {
+            setStatus(
+                "Please select a JPG, PNG, WebP or GIF image.",
+                "error"
+            );
+            return false;
+        }
+
+        if (file.size > maxSize) {
+            setStatus(
+                "Your image must be 5 MB or smaller.",
+                "error"
+            );
+            return false;
+        }
+
+        return true;
+    }
+
+    function showPreview(file) {
+        revokePreview();
+
+        previewUrl = URL.createObjectURL(file);
+        preview.src = previewUrl;
+
+        setStatus(
+            `${file.name} selected. Save your changes to upload it.`,
+            "success"
+        );
+    }
+
+    function restoreDragText() {
+        overlayTitle.textContent = "Change cover image";
+        overlayHint.textContent = "Choose a file or drag it here";
+    }
+
+    function setDragging(active) {
+        dropzone.classList.toggle("is-dragging", active);
+
+        if (active) {
+            overlayTitle.textContent = "Drop to upload";
+            overlayHint.textContent = "Release to use this image";
+        } else {
+            restoreDragText();
+        }
+    }
+
+    function isFileDrag(event) {
+        return Array.from(event.dataTransfer?.types || []).includes("Files");
+    }
+
+    // Standard file picker
+    input.addEventListener("change", () => {
+        const file = input.files?.[0];
+
+        if (!file) return;
+
+        if (!isValidFile(file)) {
+            input.value = "";
+            resetPreview();
+            return;
+        }
+
+        showPreview(file);
+    });
+
+    // Dragging a file over the cover
+    dropzone.addEventListener("dragenter", (event) => {
+        if (!isFileDrag(event)) return;
+
+        event.preventDefault();
+        dragDepth++;
+        setDragging(true);
+    });
+
+    dropzone.addEventListener("dragover", (event) => {
+        if (!isFileDrag(event)) return;
+
+        event.preventDefault();
+        event.dataTransfer.dropEffect = "copy";
+        setDragging(true);
+    });
+
+    dropzone.addEventListener("dragleave", (event) => {
+        if (!isFileDrag(event)) return;
+
+        event.preventDefault();
+
+        dragDepth = Math.max(0, dragDepth - 1);
+
+        if (dragDepth === 0) {
+            setDragging(false);
+        }
+    });
+
+    // Dropping a file onto the cover
+    dropzone.addEventListener("drop", (event) => {
+        if (!isFileDrag(event)) return;
+
+        event.preventDefault();
+
+        dragDepth = 0;
+        setDragging(false);
+
+        const files = Array.from(event.dataTransfer.files || []);
+
+        if (files.length !== 1) {
+            setStatus("Please drop one image at a time.", "error");
+            return;
+        }
+
+        const file = files[0];
+
+        if (!isValidFile(file)) return;
+
+        // Put the dropped file into the actual form field.
+        // This ensures it is submitted with the rest of the form.
+        try {
+            const transfer = new DataTransfer();
+            transfer.items.add(file);
+            input.files = transfer.files;
+        } catch {
+            setStatus(
+                "Drag and drop is unavailable in this browser. Click the image to choose a file.",
+                "error"
+            );
+            return;
+        }
+
+        showPreview(file);
+    });
+
+    window.addEventListener("pagehide", revokePreview);
+}
+
 
 onReady(() => {
     initBase()
@@ -2132,6 +2314,7 @@ onReady(() => {
     initLocationPicker()
     initOpeningHours()
 
+    initCoverImageUpload()
     initOverviewEditor()
 
     const ratingRangeWrapper = document

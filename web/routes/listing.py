@@ -1,12 +1,26 @@
 import re
 from datetime import datetime
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
-from flask import Blueprint, flash, redirect, render_template, url_for, jsonify, request
+from flask import (
+    Blueprint,
+    current_app,
+    flash,
+    redirect,
+    render_template,
+    url_for,
+    jsonify,
+    request,
+)
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from web.extensions import db, limiter
 from web.forms import CafeAddressForm, CafeEditForm, CafeReviewForm
 from web.models import Cafe, CafeOpeningHour, CafeReview
+from web.services.cloudinary_storage import (
+    validate_image_file,
+    upload_image_file,
+    delete_image_file,
+)
 from web.services.database import commit_session
 from web.services.geocoding import (AddressNotFound, GeocodingUnavailable, geocode_rough_address, get_directions_url,
                                     reverse_geocode)
@@ -266,6 +280,46 @@ def edit(cafe_id: int):
     if edit_form.validate_on_submit():
 
         # --------------------------------------------------
+        # Validate image selection
+        # --------------------------------------------------
+
+        image_file = edit_form.image.data
+        has_upload = bool(
+            image_file and image_file.filename
+        )
+
+        image_url = (
+                edit_form.image_url.data or ""
+        ).strip()
+
+        # A user must choose one image source.
+        if has_upload and image_url:
+            flash(
+                "Please upload an image or enter an image URL, not both.",
+                "error",
+            )
+
+            return _render_edit_page(
+                cafe,
+                edit_form,
+                address_form,
+            )
+
+        # Verify actual image contents.
+        if has_upload:
+
+            image_error = validate_image_file(image_file)
+
+            if image_error:
+                flash(image_error, "error")
+
+                return _render_edit_page(
+                    cafe,
+                    edit_form,
+                    address_form,
+                )
+
+        # --------------------------------------------------
         # Validate selected coordinates
         # --------------------------------------------------
 
@@ -332,6 +386,28 @@ def edit(cafe_id: int):
             )
 
         # --------------------------------------------------
+        # Upload new image
+        # --------------------------------------------------
+
+        old_public_id = cafe.img_public_id
+        uploaded_image = None
+
+        if has_upload:
+
+            uploaded_image, upload_error = upload_image_file(
+                image_file
+            )
+
+            if upload_error:
+                flash(upload_error, "error")
+
+                return _render_edit_page(
+                    cafe,
+                    edit_form,
+                    address_form,
+                )
+
+        # --------------------------------------------------
         # Build database updates
         # --------------------------------------------------
 
@@ -360,6 +436,27 @@ def edit(cafe_id: int):
             "location_provider": address["provider"],
             "location_provider_id": address["provider_id"],
         }
+
+        # --------------------------------------------------
+        # Image updates
+        # --------------------------------------------------
+
+        if uploaded_image:
+
+            updates.update({
+                "img_url": uploaded_image["secure_url"],
+                "img_public_id": uploaded_image["public_id"],
+                "img_asset_id": uploaded_image["asset_id"],
+            })
+
+        elif image_url:
+
+            # External image URL selected instead.
+            updates.update({
+                "img_url": image_url,
+                "img_public_id": None,
+                "img_asset_id": None,
+            })
 
         # --------------------------------------------------
         # Build opening-hours updates
@@ -420,17 +517,71 @@ def edit(cafe_id: int):
 
         if changed or opening_hours_changed:
 
-            if not commit_session(
-                    success_message="Cafe updated successfully!",
-                    error_message="Unable to update the cafe. Please try again.",
-                    integrity_error_message="The submitted cafe information conflicts with existing data.",
-                    debug_message=f"Failed to update cafe ID {cafe_id}.",
-                    integrity_debug_message=f"Integrity violation updating cafe ID {cafe_id}.",
-            ):
+            saved = commit_session(
+                success_message="Cafe updated successfully!",
+                error_message="Unable to update the cafe. Please try again.",
+                integrity_error_message=(
+                    "The submitted cafe information conflicts "
+                    "with existing data."
+                ),
+                debug_message=f"Failed to update cafe ID {cafe_id}.",
+                integrity_debug_message=(
+                    f"Integrity violation updating cafe ID {cafe_id}."
+                ),
+            )
+
+            if not saved:
+
+                # Database update failed.
+                # Remove the newly uploaded image to avoid an orphan.
+                if uploaded_image:
+
+                    cleanup_error = delete_image_file(
+                        uploaded_image["public_id"]
+                    )
+
+                    if cleanup_error:
+                        current_app.logger.error(
+                            "[Image cleanup] Failed to remove "
+                            "uncommitted image: %s",
+                            cleanup_error,
+                        )
+
                 return _render_edit_page(
                     cafe,
                     edit_form,
                     address_form,
+                )
+
+        # --------------------------------------------------
+        # Remove previous image after successful database save
+        # --------------------------------------------------
+
+        new_public_id = (
+            uploaded_image["public_id"]
+            if uploaded_image
+            else None if image_url
+            else old_public_id
+        )
+
+        if (
+                old_public_id
+                and old_public_id != new_public_id
+        ):
+
+            cleanup_error = delete_image_file(old_public_id)
+
+            if cleanup_error:
+                current_app.logger.warning(
+                    "[Image cleanup] Image was updated, "
+                    "but old image could not be deleted: %s",
+                    cleanup_error,
+                )
+
+                flash(
+                    "Your café was updated, but the previous image "
+                    "could not be removed from storage.",
+                    "warning",
                 )
 
         return redirect(

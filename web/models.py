@@ -74,6 +74,16 @@ class Cafe(db.Model):
         nullable=False
     )
 
+    img_public_id: Mapped[str | None] = mapped_column(
+        String(255),
+        nullable=True,
+    )
+
+    img_asset_id: Mapped[str | None] = mapped_column(
+        String(255),
+        nullable=True,
+    )
+
     # Address
     location: Mapped[str] = mapped_column(
         String(250),

@@ -6,10 +6,29 @@ from flask_wtf import FlaskForm
 from flask_wtf.file import FileAllowed, FileSize, FileRequired
 from phonenumbers import NumberParseException
 from typing import Literal, NewType, Sequence
-from wtforms import BooleanField, FieldList, Form, FormField, IntegerField, SelectField, TimeField
+from urllib.parse import urlparse
+from wtforms import (
+    BooleanField,
+    FieldList,
+    FileField,
+    Form,
+    FormField,
+    IntegerField,
+    SelectField,
+    TimeField,
+)
 from wtforms.fields.simple import StringField, TextAreaField, SubmitField
-from wtforms.validators import (DataRequired, Email, InputRequired, Length, NumberRange, Optional, Regexp, URL,
-                                ValidationError)
+from wtforms.validators import (
+    DataRequired,
+    Email,
+    InputRequired,
+    Length,
+    NumberRange,
+    Optional,
+    Regexp,
+    URL,
+    ValidationError
+)
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError, available_timezones
 
 # ------------------------------------------------------------------------------------------------------
@@ -563,6 +582,25 @@ URL_INVALID = "Please enter a valid url."
 URL_TOO_LONG = f"Please use {URL_MAX_LENGTH} characters or fewer."
 
 
+def validate_image_url_scheme(form, field) -> None:
+    """
+    Only allow HTTP and HTTPS image URLs.
+    """
+
+    if not field.data:
+        return
+
+    parsed = urlparse(field.data)
+
+    if (
+            parsed.scheme not in {"http", "https"}
+            or not parsed.netloc
+    ):
+        raise ValidationError(
+            "Image URLs must use HTTP or HTTPS."
+        )
+
+
 def url_validators(
         max_len: int = URL_MAX_LENGTH,
         required: bool = False,
@@ -737,12 +775,29 @@ class CafeForm(FlaskForm):
         max_entries=7,
     )
 
-    # img_url = StringField(
-    #     "Thumbnail URL",
-    #     validators=url_validators(max_len=500, required=True),
-    #     render_kw=url_render_kw(max_len=500, required=True),
-    #     filters=[strip_string],
-    # )
+    # Cover image upload
+    image = FileField(
+        "Upload cover photo",
+        validators=file_validators(
+            max_size_mb=5,
+            is_image=True,
+        ),
+        render_kw=file_render_kw(
+            max_size_mb=5,
+            is_image=True,
+        ),
+    )
+
+    # Optional external image URL
+    image_url = StringField(
+        "Image URL",
+        validators=[
+            *url_validators(max_len=500),
+            validate_image_url_scheme,
+        ],
+        render_kw=url_render_kw(max_len=500),
+        filters=[strip_string],
+    )
 
 
 class CafeAddForm(CafeForm):

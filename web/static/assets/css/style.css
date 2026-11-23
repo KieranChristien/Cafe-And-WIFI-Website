@@ -1079,3 +1079,121 @@
 .ql-editor.prose li.ql-indent-3:not(.ql-direction-rtl) {
     padding-inline-start: calc(4 * var(--bs-list-padding-x));
 }
+
+.cover-image-editor {
+    position: relative;
+    overflow: hidden;
+}
+
+/* The full-size clickable overlay */
+.cover-image-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+
+    display: grid;
+    place-items: center;
+
+    color: white;
+    text-align: center;
+    text-decoration: none;
+    cursor: pointer;
+
+    background: rgba(0, 0, 0, 0);
+    opacity: 0;
+
+    transition:
+        opacity 0.2s ease,
+        background 0.2s ease;
+}
+
+/* Show the overlay when hovering, focusing or dragging */
+.cover-image-editor:hover .cover-image-overlay,
+.cover-image-editor:focus-within .cover-image-overlay,
+.cover-image-editor.is-dragging .cover-image-overlay {
+    opacity: 1;
+    background: rgba(0, 0, 0, 0.58);
+}
+
+.cover-image-overlay__content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.85rem;
+    padding: 1rem;
+
+    transform: translateY(8px);
+    transition: transform 0.2s ease;
+}
+
+.cover-image-editor:hover .cover-image-overlay__content,
+.cover-image-editor:focus-within .cover-image-overlay__content,
+.cover-image-editor.is-dragging .cover-image-overlay__content {
+    transform: translateY(0);
+}
+
+.cover-image-upload-icon {
+    width: 68px;
+    height: 68px;
+
+    display: grid;
+    place-items: center;
+
+    border: 1px solid rgba(255, 255, 255, 0.45);
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.16);
+}
+
+.cover-image-overlay__copy {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+
+.cover-image-overlay__copy strong {
+    font-size: 1.05rem;
+    font-weight: 600;
+}
+
+.cover-image-overlay__copy small {
+    font-size: 0.85rem;
+    opacity: 0.85;
+}
+
+/* Make the drop target obvious */
+.cover-image-editor.is-dragging {
+    box-shadow: inset 0 0 0 4px rgba(255, 255, 255, 0.9);
+}
+
+/* Touch devices don't have hover, so keep the control visible */
+@media (hover: none) {
+    .cover-image-overlay {
+        opacity: 1;
+        background: rgba(0, 0, 0, 0.28);
+    }
+
+    .cover-image-overlay__content {
+        transform: none;
+    }
+}
+
+.cover-image-overlay:focus-visible {
+    outline: 3px solid white;
+    outline-offset: -6px;
+}
+
+.cover-image-status {
+    font-size: 0.875rem;
+}
+
+.cover-image-status[hidden] {
+    display: none;
+}
+
+.cover-image-status[data-state="error"] {
+    color: var(--bs-danger);
+}
+
+.cover-image-status[data-state="success"] {
+    color: var(--bs-success);
+}

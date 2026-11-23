@@ -1,10 +1,117 @@
 import os
+
+import cloudinary
 from dotenv import load_dotenv
 from flask import Flask
-from flask_bootstrap import Bootstrap4
+from flask_bootstrap import Bootstrap
 
 from web.extensions import db, migrate, limiter
 
+
+# --------------------------------------------------
+# Environment validation
+# --------------------------------------------------
+
+def get_required_env(name: str) -> str:
+    """Get a required environment variable."""
+
+    value = os.environ.get(name, "").strip()
+
+    if not value:
+        raise RuntimeError(
+            f"Required environment variable '{name}' is not configured."
+        )
+
+    return value
+
+
+def get_optional_env(
+        name: str,
+        default: str | None = None,
+) -> str | None:
+    """Get an optional environment variable."""
+
+    value = os.environ.get(name, "").strip()
+
+    return value or default
+
+
+def get_env_group(
+        *names: str,
+        required: bool = False,
+) -> dict[str, str | None]:
+    """
+    Validate a group of related environment variables.
+
+    If any variable is configured, all must be configured.
+    If required=True, all must be configured.
+    """
+
+    values = {
+        name: get_optional_env(name)
+        for name in names
+    }
+
+    configured = [
+        bool(value)
+        for value in values.values()
+    ]
+
+    if required and not all(configured):
+        missing = [
+            name
+            for name, value in values.items()
+            if not value
+        ]
+
+        raise RuntimeError(
+            "Missing required environment variables: "
+            + ", ".join(missing)
+        )
+
+    if any(configured) and not all(configured):
+        missing = [
+            name
+            for name, value in values.items()
+            if not value
+        ]
+
+        raise RuntimeError(
+            "Incomplete environment configuration. "
+            "The following variables are missing: "
+            + ", ".join(missing)
+        )
+
+    return values
+
+
+def get_env_bool(
+        name: str,
+        default: bool = False,
+) -> bool:
+    """Parse an environment variable as a boolean."""
+
+    value = get_optional_env(name)
+
+    if value is None:
+        return default
+
+    value = value.lower()
+
+    if value in {"1", "true", "yes", "on"}:
+        return True
+
+    if value in {"0", "false", "no", "off"}:
+        return False
+
+    raise RuntimeError(
+        f"Environment variable '{name}' must be a boolean."
+    )
+
+
+# --------------------------------------------------
+# Application factory
+# --------------------------------------------------
 
 def create_app() -> Flask:
     load_dotenv()
@@ -12,46 +119,85 @@ def create_app() -> Flask:
 
     app = Flask(__name__)
 
-    # Configuration
-    secret_key = env.get("FLASK_KEY")
+    # --------------------------------------------------
+    # Application configuration
+    # --------------------------------------------------
 
-    if not secret_key:
-        raise RuntimeError("SECRET_KEY is not configured")
+    app.config.update({
 
-    app.config['SECRET_KEY'] = secret_key
+        "SECRET_KEY": get_required_env("FLASK_KEY"),
 
-    # Debug configuration
-    app.config["DEBUG"] = env.get(
-        "FLASK_DEBUG", "false"
-    ).strip().lower() in {"1", "true", "yes", "on"}
+        "DEBUG": get_env_bool("FLASK_DEBUG"),
 
-    database_url = env.get('DATABASE_URI')
-    if not database_url:
-        raise RuntimeError("DATABASE_URI is not configured")
+        "SQLALCHEMY_DATABASE_URI": get_required_env(
+            "DATABASE_URI"
+        ),
 
-    app.config['RATELIMIT_STORAGE_URI'] = env.get(
-        "STORAGE_URI",
-        "memory://"
+        "RATELIMIT_STORAGE_URI": get_optional_env(
+            "STORAGE_URI",
+            "memory://"
+        ),
+
+        "TOMTOM_API_KEY": get_required_env(
+            "TOMTOM_API_KEY"
+        ),
+
+        "MAX_CONTENT_LENGTH": 6 * 1024 * 1024,
+
+    })
+
+    # --------------------------------------------------
+    # Cloudinary configuration
+    # --------------------------------------------------
+
+    cloudinary_configs = get_env_group(
+        "CLOUDINARY_NAME",
+        "CLOUDINARY_KEY",
+        "CLOUDINARY_SECRET",
     )
 
-    app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+    app.config.update({
 
-    tomtom_api_key = env.get("TOMTOM_API_KEY")
-    if not tomtom_api_key:
-        raise RuntimeError("TOMTOM_API_KEY is not configured")
+        "CLOUDINARY_NAME": cloudinary_configs["CLOUDINARY_NAME"],
 
-    app.config["TOMTOM_API_KEY"] = tomtom_api_key
+        "CLOUDINARY_KEY": cloudinary_configs["CLOUDINARY_KEY"],
 
+        "CLOUDINARY_SECRET": cloudinary_configs["CLOUDINARY_SECRET"],
+
+        "CLOUDINARY_ENABLED": bool(
+            cloudinary_configs["CLOUDINARY_NAME"]
+        ),
+
+    })
+
+    if app.config["CLOUDINARY_ENABLED"]:
+        cloudinary.config(
+            cloud_name=app.config["CLOUDINARY_NAME"],
+            api_key=app.config["CLOUDINARY_KEY"],
+            api_secret=app.config["CLOUDINARY_SECRET"],
+            secure=True,
+        )
+
+    # --------------------------------------------------
     # Extensions
-    Bootstrap4(app)
+    # --------------------------------------------------
+
+    Bootstrap(app)
+
     db.init_app(app)
     migrate.init_app(app, db)
     limiter.init_app(app)
 
-    # Import models so SQLAlchemy registers them with metadata
+    # --------------------------------------------------
+    # Register models
+    # --------------------------------------------------
+
     from web.models import Cafe, CafeAttribute
 
+    # --------------------------------------------------
     # Register blueprints
+    # --------------------------------------------------
+
     from web.routes.listing import listing
     from web.routes.main import main
     app.register_blueprint(listing)
