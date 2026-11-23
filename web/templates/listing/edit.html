@@ -10,11 +10,8 @@
                 <li class="breadcrumb-item"><a class="breadcrumb-link" href="{{ url_for('main.home') }}">Home</a>
                 </li>
                 <li class="breadcrumb-divider">/</li>
-                <li class="breadcrumb-item"><a class="breadcrumb-link"
-                                               href="{{ url_for('main.home') }}#results">Coffee</a></li>
-                <li class="breadcrumb-divider">/</li>
                 <li class="breadcrumb-item" aria-current="page">
-                    <a class="breadcrumb-link active" href="view.html">
+                    <a class="breadcrumb-link active" href="{{ url_for('listing.view', cafe_id=cafe.id) }}">
                         {{
                         cafe.name }}
                     </a>
@@ -132,11 +129,6 @@
                     <li class="nav-item" role="presentation">
                         <button class="nav-link active" id="ov-tab" data-bs-toggle="tab" data-bs-target="#ov"
                                 type="button" role="tab" aria-controls="ov" aria-selected="true">Overview
-                        </button>
-                    </li>
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link" id="rv-tab" data-bs-toggle="tab" data-bs-target="#rv" type="button"
-                                role="tab" aria-controls="rv" aria-selected="false">Reviews
                         </button>
                     </li>
                     <li class="nav-item" role="presentation">
@@ -269,75 +261,19 @@
                         </div>
 
                     </dialog>
-                    <div class="tab-pane fade" id="rv" role="tabpanel" aria-labelledby="rv-tab" tabindex="0">
-                        <div class="vstack gap-5" style="max-width:44rem">
-                            {% for review in cafe.reviews %}
-                            <figure class="surface surface-pad mb-0">
-                                <div class="stars mb-4" role="img" aria-label="{{ review.rating }} out of 5">
-                                    {% for _ in range(review.rating) %}
-                                    <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-                                        <path d="m8 1.5 1.9 4 4.35.6-3.15 3.05.76 4.35L8 11.45 4.14 13.5l.76-4.35L1.75 6.1 6.1 5.5z"/>
-                                    </svg>
-                                    {% endfor %}
-                                </div>
-                                <blockquote class="mb-4">
-                                    "{{ review.body }}"
-                                </blockquote>
-                                <figcaption class="d-flex align-items-center gap-4">
-                                    <span class="avatar">
-                                        <span class="avatar-initials">
-                                            {% set names = review.name.split() %}
-
-                                            {% if names %}
-                                                {% set initials = names[0][0] ~ (names[-1][0] if names|length > 1 else names[0][1:2]) %}
-                                                {{ initials|upper }}
-                                            {% else %}
-                                                ?
-                                            {% endif %}
-                                        </span>
-                                    </span>
-                                    <span>
-                                        <span class="d-block fw-semibold fs-sm">
-                                           {% if names %}
-                                                {% set name = names[0] ~ " " ~ (names[-1][0] if names|length > 1 else names[0]) ~ "." %}
-                                                {{ name|title }}
-                                            {% else %}
-                                                ?
-                                            {% endif %}
-                                        </span>
-                                        <span class="d-block fg-3 fs-xs">
-                                            42 reviews
-                                        </span>
-                                    </span>
-                                </figcaption>
-                            </figure>
-                            {% else %}
-                            <p class="fg-2">
-                                No reviews yet. Be the first to leave one!
-                            </p>
-                            {% endfor %}
-                        </div>
-                    </div>
                     <div class="tab-pane fade" id="phts" role="tabpanel" aria-labelledby="ph-tab" tabindex="0">
                         <div class="row g-4" style="max-width:44rem">
+                            {% for photo in cafe.photos %}
                             <div class="col-6 md:col-4">
-                                <div class="ph ph-1x1 rounded-5">Bar</div>
+                                <div class="ph ph-1x1 rounded-5">
+                                    <img
+                                            src="{{ photo.img_url }}"
+                                            alt="{{ cafe.name }}"
+                                            loading="lazy"
+                                    >
+                                </div>
                             </div>
-                            <div class="col-6 md:col-4">
-                                <div class="ph ph-1x1 rounded-5">Roaster</div>
-                            </div>
-                            <div class="col-6 md:col-4">
-                                <div class="ph ph-1x1 rounded-5">Filter</div>
-                            </div>
-                            <div class="col-6 md:col-4">
-                                <div class="ph ph-1x1 rounded-5">Terrace</div>
-                            </div>
-                            <div class="col-6 md:col-4">
-                                <div class="ph ph-1x1 rounded-5">Beans</div>
-                            </div>
-                            <div class="col-6 md:col-4">
-                                <div class="ph ph-1x1 rounded-5">Street</div>
-                            </div>
+                            {% endfor %}
                         </div>
                     </div>
                 </div>
