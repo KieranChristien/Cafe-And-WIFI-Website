@@ -1102,9 +1102,8 @@
     background: rgba(0, 0, 0, 0);
     opacity: 0;
 
-    transition:
-        opacity 0.2s ease,
-        background 0.2s ease;
+    transition: opacity 0.2s ease,
+    background 0.2s ease;
 }
 
 /* Show the overlay when hovering, focusing or dragging */
@@ -1196,4 +1195,190 @@
 
 .cover-image-status[data-state="success"] {
     color: var(--bs-success);
+}
+
+
+/* --------------------------------------------------
+   Café gallery photo editor
+   -------------------------------------------------- */
+
+.cafe-photos-editor {
+    width: 100%;
+}
+
+.cafe-photos-dropzone {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+
+    min-height: 11rem;
+    padding: 1.5rem;
+
+    border: 2px dashed var(--bs-border-color);
+    border-radius: 0.875rem;
+
+    text-align: center;
+
+    transition: border-color 0.2s ease,
+    background 0.2s ease;
+}
+
+.cafe-photos-dropzone.is-dragging {
+    border-color: var(--bs-primary-base);
+    background: var(--bs-bg-2);
+}
+
+.cafe-photos-dropzone.is-full {
+    opacity: 0.65;
+}
+
+.cafe-photos-dropzone__icon {
+    display: grid;
+    place-items: center;
+
+    width: 3.5rem;
+    height: 3.5rem;
+
+    flex-shrink: 0;
+
+    border-radius: 50%;
+
+    background: var(--bs-bg-2);
+    color: var(--bs-primary-base);
+
+    font-size: 1.75rem;
+}
+
+.cafe-photos-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr));
+    gap: 1rem;
+}
+
+.cafe-photo-card {
+    min-width: 0;
+    margin: 0;
+}
+
+.cafe-photo-card__image {
+    position: relative;
+    overflow: hidden;
+
+    aspect-ratio: 1;
+
+    border-radius: 0.75rem;
+    background: var(--bs-bg-2);
+}
+
+.cafe-photo-card__image > img {
+    width: 100%;
+    height: 100%;
+
+    display: block;
+
+    object-fit: cover;
+}
+
+.cafe-photo-card__caption {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+
+    margin-top: 0.5rem;
+
+    color: var(--bs-fg-3);
+    font-size: 0.75rem;
+}
+
+.cafe-photo-card__filename {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.cafe-photo-card__remove {
+    flex-shrink: 0;
+
+    padding: 0;
+
+    border: 0;
+    background: transparent;
+
+    color: var(--bs-danger);
+    cursor: pointer;
+}
+
+.cafe-photo-remove {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    z-index: 2;
+
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+
+    padding: 0.35rem 0.55rem;
+
+    border-radius: 0.4rem;
+
+    color: white;
+    background: rgb(0 0 0 / 65%);
+
+    font-size: 0.7rem;
+    cursor: pointer;
+}
+
+.cafe-photo-remove input {
+    margin: 0;
+    accent-color: var(--bs-danger);
+}
+
+.cafe-photo-removal-overlay {
+    position: absolute;
+    inset: 0;
+
+    display: none;
+    align-items: center;
+    justify-content: center;
+
+    color: white;
+    background: rgb(180 35 35 / 65%);
+
+    font-size: 0.875rem;
+    font-weight: 600;
+    text-align: center;
+}
+
+.cafe-photo-card.is-marked-for-removal
+.cafe-photo-removal-overlay {
+    display: flex;
+}
+
+.cafe-photo-card.is-marked-for-removal img {
+    filter: grayscale(1);
+}
+
+.cafe-photo-card--pending
+.cafe-photo-card__image::after {
+    content: "Pending upload";
+
+    position: absolute;
+    inset: auto 0 0;
+
+    padding: 0.35rem;
+
+    color: white;
+    background: rgb(0 0 0 / 65%);
+
+    font-size: 0.7rem;
+    text-align: center;
+}
+
+@media (max-width: 480px) {
+    .cafe-photos-dropzone {
+        flex-direction: column;
+    }
 }

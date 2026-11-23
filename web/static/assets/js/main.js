@@ -2307,6 +2307,361 @@ function initCoverImageUpload() {
 }
 
 
+// --------------------------------------------------
+// Café gallery photo uploads
+// --------------------------------------------------
+
+function initCafePhotoUpload() {
+    const dropzone = document.getElementById("photosDropzone");
+    const input = document.getElementById("photosInput");
+    const browseButton = document.getElementById("photosBrowseButton");
+    const grid = document.getElementById("photosGrid");
+    const status = document.getElementById("photosStatus");
+    const count = document.getElementById("photosCount");
+    const emptyState = document.getElementById("photosEmptyState");
+
+    const dropzoneTitle = document.getElementById("photosDropzoneTitle");
+    const dropzoneHint = document.getElementById("photosDropzoneHint");
+
+    if (!dropzone || !input || !browseButton || !grid) return;
+
+    const maxPhotos = 20;
+    const maxSize = 5 * 1024 * 1024;
+
+    const existingCount = Number(grid.dataset.existingCount || 0);
+
+    const allowedTypes = new Set([
+        "image/jpeg",
+        "image/png",
+        "image/webp",
+        "image/gif",
+    ]);
+
+    const allowedExtensions = new Set([
+        "jpg",
+        "jpeg",
+        "png",
+        "webp",
+        "gif",
+    ]);
+
+    let selectedFiles = [];
+    let previewUrls = [];
+    let dragDepth = 0;
+
+    function setStatus(message, state = "info") {
+        if (!status) return;
+
+        status.textContent = message;
+        status.dataset.state = state;
+        status.hidden = !message;
+    }
+
+    function getRemovalCheckboxes() {
+        return Array.from(
+            grid.querySelectorAll("[data-remove-photo]")
+        );
+    }
+
+    function getRemovalCount() {
+        return getRemovalCheckboxes()
+            .filter(checkbox => checkbox.checked)
+            .length;
+    }
+
+    function getRemainingSlots() {
+        return maxPhotos - (
+            existingCount -
+            getRemovalCount() +
+            selectedFiles.length
+        );
+    }
+
+    function updateCount() {
+        const total = (
+            existingCount -
+            getRemovalCount() +
+            selectedFiles.length
+        );
+
+        if (count) {
+            count.textContent = `${total} / ${maxPhotos} photos`;
+        }
+
+        if (emptyState) {
+            emptyState.hidden = total > 0;
+        }
+
+        browseButton.disabled = getRemainingSlots() <= 0;
+
+        if (getRemainingSlots() <= 0) {
+            dropzone.classList.add("is-full");
+        } else {
+            dropzone.classList.remove("is-full");
+        }
+    }
+
+    function revokePreviews() {
+        previewUrls.forEach(url => URL.revokeObjectURL(url));
+        previewUrls = [];
+    }
+
+    function syncInputFiles() {
+        try {
+            const transfer = new DataTransfer();
+
+            selectedFiles.forEach(file => {
+                transfer.items.add(file);
+            });
+
+            input.files = transfer.files;
+
+            return true;
+
+        } catch {
+            setStatus(
+                "Your browser could not prepare these files for upload.",
+                "error"
+            );
+
+            return false;
+        }
+    }
+
+    function isValidFile(file) {
+        const extension = file.name
+            .split(".")
+            .pop()
+            .toLowerCase();
+
+        if (
+            !allowedExtensions.has(extension) ||
+            (file.type && !allowedTypes.has(file.type))
+        ) {
+            setStatus(
+                "Only JPG, PNG, WebP and GIF images are supported.",
+                "error"
+            );
+
+            return false;
+        }
+
+        if (!file.size || file.size > maxSize) {
+            setStatus(
+                "Each photo must be 5 MB or smaller.",
+                "error"
+            );
+
+            return false;
+        }
+
+        return true;
+    }
+
+    function renderPendingPhotos() {
+        revokePreviews();
+
+        grid.querySelectorAll("[data-pending-photo]")
+            .forEach(card => card.remove());
+
+        selectedFiles.forEach((file, index) => {
+
+            const card = document.createElement("figure");
+            card.className = "cafe-photo-card cafe-photo-card--pending";
+            card.dataset.pendingPhoto = "";
+
+            const imageFrame = document.createElement("div");
+            imageFrame.className = "cafe-photo-card__image";
+
+            const image = document.createElement("img");
+
+            const previewUrl = URL.createObjectURL(file);
+            previewUrls.push(previewUrl);
+
+            image.src = previewUrl;
+            image.alt = file.name;
+
+            imageFrame.appendChild(image);
+
+            const caption = document.createElement("figcaption");
+            caption.className = "cafe-photo-card__caption";
+
+            const fileName = document.createElement("span");
+            fileName.className = "cafe-photo-card__filename";
+            fileName.textContent = file.name;
+
+            const removeButton = document.createElement("button");
+
+            removeButton.type = "button";
+            removeButton.className = "cafe-photo-card__remove";
+            removeButton.textContent = "Remove";
+
+            removeButton.addEventListener("click", () => {
+
+                selectedFiles.splice(index, 1);
+
+                if (syncInputFiles()) {
+                    renderPendingPhotos();
+                    updateCount();
+                }
+
+            });
+
+            caption.append(fileName, removeButton);
+
+            card.append(imageFrame, caption);
+
+            grid.appendChild(card);
+        });
+    }
+
+    function updateRemovalAppearance() {
+        getRemovalCheckboxes().forEach(checkbox => {
+
+            const card = checkbox.closest(".cafe-photo-card");
+
+            if (!card) return;
+
+            card.classList.toggle(
+                "is-marked-for-removal",
+                checkbox.checked
+            );
+
+        });
+
+        updateCount();
+    }
+
+    function addFiles(files) {
+        const incoming = Array.from(files || []);
+
+        if (!incoming.length) return;
+
+        const validFiles = incoming.filter(isValidFile);
+
+        const uniqueFiles = validFiles.filter(file => {
+            return !selectedFiles.some(selected =>
+                selected.name === file.name &&
+                selected.size === file.size &&
+                selected.lastModified === file.lastModified
+            );
+        });
+
+        if (uniqueFiles.length > getRemainingSlots()) {
+            setStatus(
+                `You can have a maximum of ${maxPhotos} photos in total. ` +
+                `You can currently add ${Math.max(0, getRemainingSlots())}.`,
+                "error"
+            );
+
+            return;
+        }
+
+        if (!uniqueFiles.length) return;
+
+        selectedFiles.push(...uniqueFiles);
+
+        if (syncInputFiles()) {
+            renderPendingPhotos();
+            updateCount();
+
+            setStatus(
+                `${selectedFiles.length} new photo(s) selected. ` +
+                "Save your changes to upload them.",
+                "success"
+            );
+        }
+    }
+
+    function isFileDrag(event) {
+        return Array.from(
+            event.dataTransfer?.types || []
+        ).includes("Files");
+    }
+
+    function setDragging(active) {
+        dropzone.classList.toggle("is-dragging", active);
+
+        if (dropzoneTitle && dropzoneHint) {
+            dropzoneTitle.textContent = active
+                ? "Drop to add photos"
+                : "Add photos to this café";
+
+            dropzoneHint.textContent = active
+                ? "Release to add these images."
+                : "Drag and drop images here, or browse your files.";
+        }
+    }
+
+    // Browse files.
+    browseButton.addEventListener("click", () => {
+        input.click();
+    });
+
+    input.addEventListener("change", () => {
+        addFiles(input.files);
+    });
+
+    // Existing photo removal checkboxes.
+    getRemovalCheckboxes().forEach(checkbox => {
+        checkbox.addEventListener("change", () => {
+            updateRemovalAppearance();
+            updateCount();
+        });
+    });
+
+    // Drag and drop.
+    dropzone.addEventListener("dragenter", event => {
+        if (!isFileDrag(event)) return;
+
+        event.preventDefault();
+
+        dragDepth++;
+
+        setDragging(true);
+    });
+
+    dropzone.addEventListener("dragover", event => {
+        if (!isFileDrag(event)) return;
+
+        event.preventDefault();
+
+        event.dataTransfer.dropEffect = "copy";
+
+        setDragging(true);
+    });
+
+    dropzone.addEventListener("dragleave", event => {
+        if (!isFileDrag(event)) return;
+
+        event.preventDefault();
+
+        dragDepth = Math.max(0, dragDepth - 1);
+
+        if (dragDepth === 0) {
+            setDragging(false);
+        }
+    });
+
+    dropzone.addEventListener("drop", event => {
+        if (!isFileDrag(event)) return;
+
+        event.preventDefault();
+
+        dragDepth = 0;
+
+        setDragging(false);
+
+        addFiles(event.dataTransfer.files);
+    });
+
+    updateRemovalAppearance();
+    updateCount();
+
+    window.addEventListener("pagehide", revokePreviews);
+}
+
+
 onReady(() => {
     initBase()
     initFormValidation()
@@ -2315,6 +2670,7 @@ onReady(() => {
     initOpeningHours()
 
     initCoverImageUpload()
+    initCafePhotoUpload()
     initOverviewEditor()
 
     const ratingRangeWrapper = document

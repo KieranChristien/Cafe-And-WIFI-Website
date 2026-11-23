@@ -262,19 +262,120 @@
 
                     </dialog>
                     <div class="tab-pane fade" id="phts" role="tabpanel" aria-labelledby="ph-tab" tabindex="0">
-                        <div class="row g-4" style="max-width:44rem">
-                            {% for photo in cafe.photos %}
-                            <div class="col-6 md:col-4">
-                                <div class="ph ph-1x1 rounded-5">
-                                    <img
-                                            src="{{ photo.img_url }}"
-                                            alt="{{ cafe.name }}"
-                                            loading="lazy"
-                                    >
+
+                        <div class="cafe-photos-editor" style="max-width:44rem">
+
+                            <!-- Upload dropzone -->
+                            <div id="photosDropzone" class="cafe-photos-dropzone">
+
+                                <div class="cafe-photos-dropzone__icon">
+                                    <i class="bi bi-cloud-arrow-up"></i>
                                 </div>
+
+                                <div>
+                                    <strong id="photosDropzoneTitle">
+                                        Add photos to this café
+                                    </strong>
+
+                                    <p id="photosDropzoneHint" class="fg-3 fs-sm mb-3">
+                                        Drag and drop images here, or browse your files.
+                                    </p>
+
+                                    <button
+                                            type="button"
+                                            id="photosBrowseButton"
+                                            class="btn-outline"
+                                    >
+                                        Browse photos
+                                    </button>
+                                </div>
+
                             </div>
-                            {% endfor %}
+
+                            <!-- File input belongs to the main edit form -->
+                            <input
+                                    type="file"
+                                    id="photosInput"
+                                    name="photos"
+                                    form="editForm"
+                                    class="visually-hidden"
+                                    accept="image/jpeg,image/png,image/webp,image/gif"
+                                    multiple
+                            >
+
+                            <div class="d-flex justify-content-between align-items-center mt-3 mb-3 gap-3">
+
+                                <p class="fg-3 fs-xs mb-0">
+                                    JPG, PNG, WebP or GIF. Maximum 5 MB per image.
+                                </p>
+
+                                <strong id="photosCount" class="fs-xs">
+                                    {{ cafe.photos|length }} / 20 photos
+                                </strong>
+
+                            </div>
+
+                            <div
+                                    id="photosStatus"
+                                    class="inline-status mb-3"
+                                    role="status"
+                                    aria-live="polite"
+                                    hidden
+                            ></div>
+
+                            <!-- Existing and pending photos -->
+                            <div
+                                    id="photosGrid"
+                                    class="cafe-photos-grid"
+                                    data-existing-count="{{ cafe.photos|length }}"
+                            >
+
+                                {% for photo in cafe.photos %}
+
+                                <figure class="cafe-photo-card">
+
+                                    <div class="cafe-photo-card__image">
+
+                                        <img
+                                                src="{{ photo.img_url }}"
+                                                alt="{{ cafe.name }} photo {{ loop.index }}"
+                                                loading="lazy"
+                                        >
+
+                                        <label class="cafe-photo-remove">
+                                            <input
+                                                    type="checkbox"
+                                                    name="remove_photo_ids"
+                                                    value="{{ photo.id }}"
+                                                    form="editForm"
+                                                    data-remove-photo
+                                            >
+
+                                            <span>Remove</span>
+                                        </label>
+
+                                        <div class="cafe-photo-removal-overlay">
+                                            Will be removed
+                                        </div>
+
+                                    </div>
+
+                                    <figcaption class="cafe-photo-card__caption">
+                                        Photo {{ loop.index }}
+                                    </figcaption>
+
+                                </figure>
+
+                                {% endfor %}
+
+                            </div>
+
+                            <p class="fg-3 fs-xs mt-3" {% if not cafe.photos %}hidden{% endif %}>>
+                                Select Remove on any existing photo to delete it when you save your changes.
+                            </p>
+
                         </div>
+
                     </div>
                 </div>
             </div>

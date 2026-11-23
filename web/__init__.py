@@ -142,7 +142,7 @@ def create_app() -> Flask:
             "TOMTOM_API_KEY"
         ),
 
-        "MAX_CONTENT_LENGTH": 6 * 1024 * 1024,
+        "MAX_CONTENT_LENGTH": 106 * 1024 * 1024,
 
     })
 

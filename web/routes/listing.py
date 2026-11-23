@@ -15,7 +15,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from web.extensions import db, limiter
 from web.forms import CafeAddressForm, CafeEditForm, CafeReviewForm
-from web.models import Cafe, CafeOpeningHour, CafeReview
+from web.models import Cafe, CafeOpeningHour, CafePhoto, CafeReview
 from web.services.cloudinary_storage import (
     validate_image_file,
     upload_image_file,
@@ -29,6 +29,9 @@ from web.services.timezone import get_timezone_from_coordinates
 from web.utils import format_phone_number
 
 listing = Blueprint('listing', __name__)
+
+MAX_TOTAL_CAFE_PHOTOS = 20
+MAX_PHOTO_SIZE_BYTES = 5 * 1024 * 1024
 
 _COORDINATE_PATTERN = re.compile(
     r"[+-]?(?:\d+(?:\.\d*)?|\.\d+)\Z"
@@ -320,6 +323,84 @@ def edit(cafe_id: int):
                 )
 
         # --------------------------------------------------
+        # Validate gallery photo changes
+        # --------------------------------------------------
+
+        photo_files = [
+            photo
+            for photo in request.files.getlist("photos")
+            if photo and photo.filename
+        ]
+
+        # Identify existing photos selected for removal.
+        raw_remove_ids = request.form.getlist("remove_photo_ids")
+
+        try:
+            remove_photo_ids = {
+                int(photo_id)
+                for photo_id in raw_remove_ids
+            }
+        except ValueError:
+            flash("Invalid photo selection.", "error")
+            return _render_edit_page(cafe, edit_form, address_form)
+
+        existing_photos = {
+            photo.id: photo
+            for photo in cafe.photos
+        }
+
+        # Prevent a user from deleting another café's photos.
+        if not remove_photo_ids.issubset(existing_photos.keys()):
+            flash("Invalid photo selection.", "error")
+            return _render_edit_page(cafe, edit_form, address_form)
+
+        # Calculate the final gallery size.
+        final_photo_count = (
+                len(existing_photos)
+                - len(remove_photo_ids)
+                + len(photo_files)
+        )
+
+        if final_photo_count > MAX_TOTAL_CAFE_PHOTOS:
+            flash(
+                f"A café can have a maximum of "
+                f"{MAX_TOTAL_CAFE_PHOTOS} photos. "
+                f"Remove some existing photos before adding more.",
+                "error",
+            )
+            return _render_edit_page(cafe, edit_form, address_form)
+
+        # Validate each uploaded gallery image.
+        for photo_file in photo_files:
+
+            try:
+                photo_file.stream.seek(0, 2)
+                photo_size = photo_file.stream.tell()
+            finally:
+                photo_file.stream.seek(0)
+
+            if not 0 < photo_size <= MAX_PHOTO_SIZE_BYTES:
+                flash(
+                    f"{photo_file.filename} must be 5 MB or smaller.",
+                    "error",
+                )
+                return _render_edit_page(cafe, edit_form, address_form)
+
+            photo_error = validate_image_file(photo_file)
+
+            if photo_error:
+                flash(
+                    f"{photo_file.filename}: {photo_error}",
+                    "error",
+                )
+                return _render_edit_page(cafe, edit_form, address_form)
+
+        photos_to_remove = [
+            existing_photos[photo_id]
+            for photo_id in remove_photo_ids
+        ]
+
+        # --------------------------------------------------
         # Validate selected coordinates
         # --------------------------------------------------
 
@@ -386,12 +467,16 @@ def edit(cafe_id: int):
             )
 
         # --------------------------------------------------
-        # Upload new image
+        # Upload cover image and gallery photos
         # --------------------------------------------------
 
         old_public_id = cafe.img_public_id
-        uploaded_image = None
 
+        uploaded_image = None
+        uploaded_assets = []
+        uploaded_photo_records = []
+
+        # Upload the cover image if one was selected.
         if has_upload:
 
             uploaded_image, upload_error = upload_image_file(
@@ -406,6 +491,51 @@ def edit(cafe_id: int):
                     edit_form,
                     address_form,
                 )
+
+            uploaded_assets.append(uploaded_image)
+
+        # Upload each gallery photo.
+        for index, photo_file in enumerate(photo_files, start=1):
+
+            uploaded_photo, upload_error = upload_image_file(
+                photo_file
+            )
+
+            if upload_error:
+
+                # Remove any images already uploaded in this request.
+                for uploaded in uploaded_assets:
+                    cleanup_error = delete_image_file(
+                        uploaded["public_id"]
+                    )
+
+                    if cleanup_error:
+                        current_app.logger.error(
+                            "[Photo cleanup] %s",
+                            cleanup_error,
+                        )
+
+                flash(
+                    f"Gallery photo {index} could not be uploaded: "
+                    f"{upload_error}",
+                    "error",
+                )
+
+                return _render_edit_page(
+                    cafe,
+                    edit_form,
+                    address_form,
+                )
+
+            uploaded_assets.append(uploaded_photo)
+
+            uploaded_photo_records.append(
+                CafePhoto(
+                    img_url=uploaded_photo["secure_url"],
+                    img_public_id=uploaded_photo["public_id"],
+                    img_asset_id=uploaded_photo["asset_id"],
+                )
+            )
 
         # --------------------------------------------------
         # Build database updates
@@ -436,27 +566,6 @@ def edit(cafe_id: int):
             "location_provider": address["provider"],
             "location_provider_id": address["provider_id"],
         }
-
-        # --------------------------------------------------
-        # Image updates
-        # --------------------------------------------------
-
-        if uploaded_image:
-
-            updates.update({
-                "img_url": uploaded_image["secure_url"],
-                "img_public_id": uploaded_image["public_id"],
-                "img_asset_id": uploaded_image["asset_id"],
-            })
-
-        elif image_url:
-
-            # External image URL selected instead.
-            updates.update({
-                "img_url": image_url,
-                "img_public_id": None,
-                "img_asset_id": None,
-            })
 
         # --------------------------------------------------
         # Build opening-hours updates
@@ -503,6 +612,47 @@ def edit(cafe_id: int):
                 opening_hours_changed = True
 
         # --------------------------------------------------
+        # Image updates
+        # --------------------------------------------------
+
+        if uploaded_image:
+
+            updates.update({
+                "img_url": uploaded_image["secure_url"],
+                "img_public_id": uploaded_image["public_id"],
+                "img_asset_id": uploaded_image["asset_id"],
+            })
+
+        elif image_url:
+
+            # External image URL selected instead.
+            updates.update({
+                "img_url": image_url,
+                "img_public_id": None,
+                "img_asset_id": None,
+            })
+
+        # --------------------------------------------------
+        # Apply gallery changes
+        # --------------------------------------------------
+
+        for photo in uploaded_photo_records:
+            cafe.photos.append(photo)
+
+        for photo in photos_to_remove:
+            db.session.delete(photo)
+
+        gallery_changed = bool(
+            uploaded_photo_records or photos_to_remove
+        )
+
+        removed_photo_public_ids = [
+            photo.img_public_id
+            for photo in photos_to_remove
+            if photo.img_public_id
+        ]
+
+        # --------------------------------------------------
         # Apply only actual changes
         # --------------------------------------------------
 
@@ -515,7 +665,7 @@ def edit(cafe_id: int):
         for key, value in changed.items():
             setattr(cafe, key, value)
 
-        if changed or opening_hours_changed:
+        if changed or opening_hours_changed or gallery_changed:
 
             saved = commit_session(
                 success_message="Cafe updated successfully!",
@@ -532,12 +682,12 @@ def edit(cafe_id: int):
 
             if not saved:
 
-                # Database update failed.
-                # Remove the newly uploaded image to avoid an orphan.
-                if uploaded_image:
+                # The database transaction failed.
+                # Remove all newly uploaded Cloudinary images.
+                for uploaded in uploaded_assets:
 
                     cleanup_error = delete_image_file(
-                        uploaded_image["public_id"]
+                        uploaded["public_id"]
                     )
 
                     if cleanup_error:
@@ -551,6 +701,27 @@ def edit(cafe_id: int):
                     cafe,
                     edit_form,
                     address_form,
+                )
+
+        # --------------------------------------------------
+        # Delete removed gallery photos from Cloudinary
+        # --------------------------------------------------
+
+        for public_id in removed_photo_public_ids:
+
+            cleanup_error = delete_image_file(public_id)
+
+            if cleanup_error:
+                current_app.logger.warning(
+                    "[Photo cleanup] Database removal succeeded, "
+                    "but Cloudinary deletion failed: %s",
+                    cleanup_error,
+                )
+
+                flash(
+                    "Some removed photos could not be deleted "
+                    "from image storage.",
+                    "warning",
                 )
 
         # --------------------------------------------------
