@@ -2314,7 +2314,6 @@ function initCoverImageUpload() {
 function initCafePhotoUpload() {
     const dropzone = document.getElementById("photosDropzone");
     const input = document.getElementById("photosInput");
-    const browseButton = document.getElementById("photosBrowseButton");
     const grid = document.getElementById("photosGrid");
     const status = document.getElementById("photosStatus");
     const count = document.getElementById("photosCount");
@@ -2323,7 +2322,7 @@ function initCafePhotoUpload() {
     const dropzoneTitle = document.getElementById("photosDropzoneTitle");
     const dropzoneHint = document.getElementById("photosDropzoneHint");
 
-    if (!dropzone || !input || !browseButton || !grid) return;
+    if (!dropzone || !input || !grid) return;
 
     const maxPhotos = 20;
     const maxSize = 5 * 1024 * 1024;
@@ -2392,13 +2391,10 @@ function initCafePhotoUpload() {
             emptyState.hidden = total > 0;
         }
 
-        browseButton.disabled = getRemainingSlots() <= 0;
-
-        if (getRemainingSlots() <= 0) {
-            dropzone.classList.add("is-full");
-        } else {
-            dropzone.classList.remove("is-full");
-        }
+        dropzone.classList.toggle(
+            "is-full",
+            getRemainingSlots() <= 0
+        );
     }
 
     function revokePreviews() {
@@ -2497,14 +2493,22 @@ function initCafePhotoUpload() {
             removeButton.textContent = "Remove";
 
             removeButton.addEventListener("click", () => {
-
                 selectedFiles.splice(index, 1);
 
                 if (syncInputFiles()) {
                     renderPendingPhotos();
                     updateCount();
-                }
 
+                    if (selectedFiles.length > 0) {
+                        setStatus(
+                            `${selectedFiles.length} new photo(s) selected. ` +
+                            "Save your changes to upload them.",
+                            "success"
+                        );
+                    } else {
+                        setStatus("");
+                    }
+                }
             });
 
             caption.append(fileName, removeButton);
@@ -2594,9 +2598,6 @@ function initCafePhotoUpload() {
     }
 
     // Browse files.
-    browseButton.addEventListener("click", () => {
-        input.click();
-    });
 
     input.addEventListener("change", () => {
         addFiles(input.files);
