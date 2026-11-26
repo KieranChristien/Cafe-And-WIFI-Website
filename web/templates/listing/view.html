@@ -183,18 +183,79 @@
                         <div class="row g-4" style="max-width:44rem">
                             {% for photo in cafe.photos %}
                             <div class="col-6 md:col-4">
-                                <div class="ph ph-1x1 rounded-5">
+                                <a
+                                        href="{{ photo.img_url }}"
+                                        class="ph ph-1x1 rounded-5 listing-gallery-trigger"
+                                        data-listing-gallery-image
+                                        aria-label="Open photo {{ loop.index }} of {{ cafe.photos|length }}"
+                                >
                                     <img
                                             src="{{ photo.img_url }}"
-                                            alt="{{ cafe.name }}"
+                                            alt="{{ cafe.name }} photo {{ loop.index }}"
                                             loading="lazy"
                                     >
-                                </div>
+                                </a>
                             </div>
                             {% else %}
                             <p class="fg-2">No photos have been added yet.</p>
                             {% endfor %}
                         </div>
+
+                        <dialog
+                                id="listingPhotoLightbox"
+                                class="listing-photo-lightbox"
+                                aria-label="Photo viewer"
+                        >
+                            <div class="listing-photo-lightbox__content">
+
+                                <button
+                                        type="button"
+                                        class="listing-photo-lightbox__close"
+                                        data-lightbox-close
+                                        aria-label="Close photo viewer"
+                                        autofocus
+                                >
+                                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                                        <path d="M6 6l12 12M18 6 6 18"/>
+                                    </svg>
+                                </button>
+
+                                <button
+                                        type="button"
+                                        class="listing-photo-lightbox__nav listing-photo-lightbox__nav--previous"
+                                        data-lightbox-previous
+                                        aria-label="Previous photo"
+                                >
+                                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                                        <path d="m15 18-6-6 6-6"/>
+                                    </svg>
+                                </button>
+
+                                <div class="listing-photo-lightbox__stage">
+                                    <img id="listingPhotoLightboxImage" alt="">
+                                </div>
+
+                                <button
+                                        type="button"
+                                        class="listing-photo-lightbox__nav listing-photo-lightbox__nav--next"
+                                        data-lightbox-next
+                                        aria-label="Next photo"
+                                >
+                                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                                        <path d="m9 18 6-6-6-6"/>
+                                    </svg>
+                                </button>
+
+                                <p
+                                        id="listingPhotoLightboxCount"
+                                        class="listing-photo-lightbox__count"
+                                        role="status"
+                                        aria-live="polite"
+                                        aria-atomic="true"
+                                ></p>
+
+                            </div>
+                        </dialog>
                     </div>
                 </div>
             </div>

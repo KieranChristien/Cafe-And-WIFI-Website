@@ -754,6 +754,13 @@ class CafeForm(FlaskForm):
         filters=[strip_string],
     )
 
+    description = TextAreaField(
+        "Short Description",
+        validators=string_validators(max_len=240),
+        render_kw=string_render_kw(max_len=240),
+        filters=[strip_string],
+    )
+
     phone_number = StringField(
         "Phone Number (Optional)",
         validators=phone_validators(),
@@ -767,6 +774,10 @@ class CafeForm(FlaskForm):
         validators=timezone_validators(required=True),
         render_kw=timezone_render_kw(required=True),
         validate_choice=True,
+    )
+
+    is_manually_closed = BooleanField(
+        "Temporarily closed"
     )
 
     opening_hours = FieldList(
@@ -798,6 +809,18 @@ class CafeForm(FlaskForm):
         render_kw=url_render_kw(max_len=500),
         filters=[strip_string],
     )
+
+    def validate(self, extra_validators=None):
+
+        if self.is_manually_closed.data:
+
+            # Skip opening-hour validation while the café
+            # is manually closed.
+            for entry in self.opening_hours.entries:
+                entry.form.opens_at.validators = []
+                entry.form.closes_at.validators = []
+
+        return super().validate(extra_validators=extra_validators)
 
 
 class CafeAddForm(CafeForm):

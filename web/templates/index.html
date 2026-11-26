@@ -227,8 +227,15 @@
                                         {{ cafe.location }}
                                     </span>
                                 </div>
-                                <p class="fg-2 fs-sm mb-4">Four tables, one menu, whatever the market had that morning.
-                                    Book two weeks out.</p>
+                                {% if cafe.description %}
+                                <p class="fg-2 fs-sm mb-4">
+                                    {{ cafe.description }}
+                                </p>
+                                {% elif cafe.overview %}
+                                <p class="fg-2 fs-sm mb-4">
+                                    {{ cafe.overview | striptags | truncate(180) }}
+                                </p>
+                                {% endif %}
                                 <div class="d-flex flex-wrap gap-3 mb-4">
                                     {% for attribute in cafe.attributes %}
                                     <span class="chip">{{ attribute.name }}</span>

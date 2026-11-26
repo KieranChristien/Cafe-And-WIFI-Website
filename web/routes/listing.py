@@ -545,6 +545,7 @@ def edit(cafe_id: int):
 
             # General café information
             "name": (edit_form.name.data or "").strip() or None,
+            "description": (edit_form.description.data or "").strip() or None,
             "overview": sanitize_overview(edit_form.overview.data),
             "phone_number": (edit_form.phone_number.data or "").strip() or None,
 
@@ -561,6 +562,7 @@ def edit(cafe_id: int):
             "longitude": longitude,
 
             "timezone": (edit_form.timezone.data or "").strip() or None,
+            "is_manually_closed": edit_form.is_manually_closed.data,
 
             # Geocoding metadata
             "location_provider": address["provider"],
@@ -571,45 +573,56 @@ def edit(cafe_id: int):
         # Build opening-hours updates
         # --------------------------------------------------
 
-        hours_by_weekday = {
-            hour.weekday: hour
-            for hour in cafe.opening_hours
-        }
-
         opening_hours_changed = False
 
-        for weekday, entry in enumerate(edit_form.opening_hours.entries):
+        # Only update the weekly schedule when the café
+        # is not manually closed.
+        if not edit_form.is_manually_closed.data:
 
-            day_form = entry.form
+            hours_by_weekday = {
+                hour.weekday: hour
+                for hour in cafe.opening_hours
+            }
 
-            # Closed days have no opening or closing times.
-            opens_at = None if day_form.is_closed.data else day_form.opens_at.data
-            closes_at = None if day_form.is_closed.data else day_form.closes_at.data
+            for weekday, entry in enumerate(edit_form.opening_hours.entries):
 
-            existing_hours = hours_by_weekday.get(weekday)
+                day_form = entry.form
 
-            if existing_hours is None:
-
-                # Create a missing weekday record.
-                existing_hours = CafeOpeningHour(
-                    weekday=weekday,
-                    opens_at=opens_at,
-                    closes_at=closes_at,
+                opens_at = (
+                    None
+                    if day_form.is_closed.data
+                    else day_form.opens_at.data
                 )
 
-                cafe.opening_hours.append(existing_hours)
+                closes_at = (
+                    None
+                    if day_form.is_closed.data
+                    else day_form.closes_at.data
+                )
 
-                opening_hours_changed = True
+                existing_hours = hours_by_weekday.get(weekday)
 
-            elif (
-                    existing_hours.opens_at != opens_at
-                    or existing_hours.closes_at != closes_at
-            ):
+                if existing_hours is None:
 
-                existing_hours.opens_at = opens_at
-                existing_hours.closes_at = closes_at
+                    existing_hours = CafeOpeningHour(
+                        weekday=weekday,
+                        opens_at=opens_at,
+                        closes_at=closes_at,
+                    )
 
-                opening_hours_changed = True
+                    cafe.opening_hours.append(existing_hours)
+
+                    opening_hours_changed = True
+
+                elif (
+                        existing_hours.opens_at != opens_at
+                        or existing_hours.closes_at != closes_at
+                ):
+
+                    existing_hours.opens_at = opens_at
+                    existing_hours.closes_at = closes_at
+
+                    opening_hours_changed = True
 
         # --------------------------------------------------
         # Image updates

@@ -64,6 +64,11 @@ class Cafe(db.Model):
         nullable=True,
     )
 
+    description: Mapped[str | None] = mapped_column(
+        String(240),
+        nullable=True,
+    )
+
     phone_number: Mapped[str | None] = mapped_column(
         String(32),
         nullable=True,

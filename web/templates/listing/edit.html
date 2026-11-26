@@ -146,7 +146,29 @@
                          aria-labelledby="ov-tab"
                          tabindex="0">
 
-                        <div class="overview-editor" style="max-width:44rem">
+                        <div class="form-field mb-5 edit-panel-width" style="max-width:44rem">
+
+                            {{ edit_form.description.label(
+                            class="form-label",
+                            for="cafeDescription"
+                            ) }}
+
+                            {{ edit_form.description(
+                            id="cafeDescription",
+                            form="editForm",
+                            class="form-control",
+                            rows="2",
+                            placeholder="Write a short description of this café..."
+                            ) }}
+
+                            <p class="fg-3 fs-xs mt-2">
+                                Shown underneath the café name on search results.
+                                Keep it to one or two sentences (240 characters maximum).
+                            </p>
+
+                        </div>
+
+                        <div class="overview-editor edit-panel-width" style="max-width:44rem">
 
                             <label
                                     class="visually-hidden"
@@ -263,7 +285,7 @@
                     </dialog>
                     <div class="tab-pane fade" id="phts" role="tabpanel" aria-labelledby="ph-tab" tabindex="0">
 
-                        <div class="cafe-photos-editor" style="max-width:44rem">
+                        <div class="cafe-photos-editor edit-panel-width" style="max-width:44rem">
 
                             <!-- Upload dropzone -->
 
@@ -488,6 +510,25 @@
                             ></div>
                         </div>
 
+                        <div class="form-field mb-4">
+                            <div class="form-check">
+                                {{ edit_form.is_manually_closed(
+                                class="form-check-input",
+                                id="isManuallyClosed"
+                                ) }}
+
+                                {{ edit_form.is_manually_closed.label(
+                                class="form-check-label",
+                                for="isManuallyClosed"
+                                ) }}
+                            </div>
+
+                            <p class="fg-3 fs-xs mt-2">
+                                Temporarily close this café regardless of its regular
+                                opening hours. Your saved weekly schedule will be retained.
+                            </p>
+                        </div>
+
                         {% set weekdays = [
                         "Monday",
                         "Tuesday",
@@ -498,65 +539,72 @@
                         "Sunday"
                         ] %}
 
-                        <h2 class="fs-sm fw-semibold mb-3">Opening hours</h2>
-                        <div class="mb-5" id="openingHours">
-                            {% for entry in edit_form.opening_hours %}
+                        <fieldset
+                                id="openingHoursFieldset"
+                                class="border-0 p-0 m-0"
+                                {% if edit_form.is_manually_closed.data %}
+                                disabled
+                                hidden
+                                {% endif %}
+                        >
+                            <h2 class="fs-sm fw-semibold mb-3">Opening hours</h2>
+                            <div class="mb-5" id="openingHours">
+                                {% for entry in edit_form.opening_hours %}
 
-                            {% set day_form = entry.form %}
-                            {% set weekday = weekdays[loop.index0] %}
+                                {% set day_form = entry.form %}
+                                {% set weekday = weekdays[loop.index0] %}
 
-                            <div class="opening-hours__row" data-opening-hours-row>
+                                <div class="opening-hours__row" data-opening-hours-row>
 
-                                <strong class="opening-hours__day">
-                                    {{ weekday }}
-                                </strong>
+                                    <strong class="opening-hours__day">
+                                        {{ weekday }}
+                                    </strong>
 
-                                <div class="opening-hours__times">
+                                    <div class="opening-hours__times">
 
-                                    <div>
-                                        <label
-                                                class="visually-hidden"
-                                                for="{{ day_form.opens_at.id }}"
-                                        >
-                                            {{ weekday }} opening time
-                                        </label>
+                                        <div>
+                                            <label
+                                                    class="visually-hidden"
+                                                    for="{{ day_form.opens_at.id }}"
+                                            >
+                                                {{ weekday }} opening time
+                                            </label>
 
-                                        {{ day_form.opens_at(class="form-control") }}
+                                            {{ day_form.opens_at(class="form-control") }}
 
-                                        {{ invalid_feedback(day_form.opens_at) }}
+                                            {{ invalid_feedback(day_form.opens_at) }}
+                                        </div>
+
+                                        <span class="fg-3 fs-xs">to</span>
+
+                                        <div>
+                                            <label
+                                                    class="visually-hidden"
+                                                    for="{{ day_form.closes_at.id }}"
+                                            >
+                                                {{ weekday }} closing time
+                                            </label>
+
+                                            {{ day_form.closes_at(class="form-control") }}
+
+                                            {{ invalid_feedback(day_form.closes_at) }}
+                                        </div>
+
                                     </div>
 
-                                    <span class="fg-3 fs-xs">to</span>
-
-                                    <div>
-                                        <label
-                                                class="visually-hidden"
-                                                for="{{ day_form.closes_at.id }}"
-                                        >
-                                            {{ weekday }} closing time
-                                        </label>
-
-                                        {{ day_form.closes_at(class="form-control") }}
-
-                                        {{ invalid_feedback(day_form.closes_at) }}
-                                    </div>
+                                    <label
+                                            class="opening-hours__closed"
+                                            for="{{ day_form.is_closed.id }}"
+                                    >
+                                        {{ day_form.is_closed(class="form-check-input") }}
+                                        <span>Closed</span>
+                                    </label>
 
                                 </div>
 
-                                <label
-                                        class="opening-hours__closed"
-                                        for="{{ day_form.is_closed.id }}"
-                                >
-                                    {{ day_form.is_closed(class="form-check-input") }}
-                                    <span>Closed</span>
-                                </label>
-
+                                {% endfor %}
                             </div>
-
-                            {% endfor %}
-                        </div>
-
-                        <!-- Selected map coordinates -->
+                        </fieldset>
 
                         <!-- Selected café coordinates -->
 

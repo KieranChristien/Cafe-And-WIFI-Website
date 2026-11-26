@@ -428,6 +428,101 @@ const initListingMap = () => {
     })
 }
 
+const initListingPhotoLightbox = () => {
+    const dialog = document.getElementById("listingPhotoLightbox");
+
+    const triggers = Array.from(
+        document.querySelectorAll("[data-listing-gallery-image]")
+    );
+
+    if (!dialog || !triggers.length) return;
+
+    const image = dialog.querySelector("#listingPhotoLightboxImage");
+    const count = dialog.querySelector("#listingPhotoLightboxCount");
+    const closeButton = dialog.querySelector("[data-lightbox-close]");
+    const previousButton = dialog.querySelector("[data-lightbox-previous]");
+    const nextButton = dialog.querySelector("[data-lightbox-next]");
+
+    if (!image || !count || !closeButton || !previousButton || !nextButton) {
+        return;
+    }
+
+    let activeIndex = 0;
+    let opener = null;
+
+    function showImage(index) {
+        activeIndex = (index + triggers.length) % triggers.length;
+
+        const trigger = triggers[activeIndex];
+        const thumbnail = trigger.querySelector("img");
+
+        image.src = trigger.href;
+        image.alt = thumbnail?.alt || ("Photo " + (activeIndex + 1));
+
+        count.textContent =
+            (activeIndex + 1) + " / " + triggers.length;
+    }
+
+    function openViewer(trigger, index) {
+        opener = trigger;
+        showImage(index);
+        dialog.showModal();
+    }
+
+    triggers.forEach((trigger, index) => {
+        trigger.addEventListener("click", event => {
+            event.preventDefault();
+            openViewer(trigger, index);
+        });
+    });
+
+    previousButton.hidden = triggers.length < 2;
+    nextButton.hidden = triggers.length < 2;
+
+    closeButton.addEventListener("click", () => {
+        dialog.close();
+    });
+
+    previousButton.addEventListener("click", () => {
+        showImage(activeIndex - 1);
+    });
+
+    nextButton.addEventListener("click", () => {
+        showImage(activeIndex + 1);
+    });
+
+    document.addEventListener("keydown", event => {
+        if (!dialog.open || triggers.length < 2) return;
+
+        if (event.key === "ArrowLeft") {
+            event.preventDefault();
+            showImage(activeIndex - 1);
+        }
+
+        if (event.key === "ArrowRight") {
+            event.preventDefault();
+            showImage(activeIndex + 1);
+        }
+    });
+
+    // Clicking the backdrop closes the viewer.
+    dialog.addEventListener("click", event => {
+        if (event.target === dialog) {
+            dialog.close();
+        }
+    });
+
+    // Restore focus to the thumbnail that opened the viewer.
+    dialog.addEventListener("close", () => {
+        image.removeAttribute("src");
+
+        if (opener) {
+            opener.focus();
+            opener = null;
+        }
+    });
+};
+
 const activateMapCafe = (cafeId) => {
     const selectedId = String(cafeId)
 
@@ -1847,6 +1942,29 @@ const initNearestSort = () => {
     })
 }
 
+const initManualClosure = () => {
+
+    const checkbox = document.getElementById('isManuallyClosed')
+    const fieldset = document.getElementById('openingHoursFieldset')
+
+    if (!checkbox || !fieldset) return
+
+    const sync = () => {
+
+        const manuallyClosed = checkbox.checked
+
+        fieldset.disabled = manuallyClosed
+        fieldset.hidden = manuallyClosed
+
+    }
+
+    checkbox.addEventListener('change', sync)
+
+    // Apply the saved state when the page loads.
+    sync()
+
+}
+
 const initOpeningHours = () => {
 
     const container = document.getElementById('openingHours')
@@ -2668,10 +2786,12 @@ onReady(() => {
     initFormValidation()
     initFeaturePicker()
     initLocationPicker()
+    initManualClosure()
     initOpeningHours()
 
     initCoverImageUpload()
     initCafePhotoUpload()
+    initListingPhotoLightbox()
     initOverviewEditor()
 
     const ratingRangeWrapper = document
