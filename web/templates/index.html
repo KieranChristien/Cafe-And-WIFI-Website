@@ -604,7 +604,9 @@
                                 value="1"
                                 {% if filters.open_now %}checked{% endif %}
                         >
-                        <label for="openNow">Open now</label>
+                        <label for="openNow">
+                            Open now
+                        </label>
                     </div>
                 </div>
             </div>
@@ -612,37 +614,42 @@
             <div class="filter-drawer-group">
                 <h3 class="fs-sm fw-semibold mb-4">Amenities</h3>
 
-                {% for amenity in cafe_amenities %}
-                <div class="form-field mb-3">
-                    <input
-                            type="checkbox"
-                            class="check"
-                            id="amenity-{{ amenity.slug }}"
-                            name="amenities"
-                            value="{{ amenity.slug }}"
-                            {% if amenity in filters.amenities %}checked{% endif %}
-                    >
-                    <label for="amenity-{{ amenity.slug }}">{{ amenity.name }}</label>
+
+                <div class="option-row d-flex flex-wrap gap-3">
+                    {% for amenity in cafe_amenities %}
+                    <label class="btn-check btn-outline theme-primary" for="amenity-{{ amenity.slug }}">
+                        <input
+                                type="checkbox"
+                                class="check"
+                                id="amenity-{{ amenity.slug }}"
+                                name="amenities"
+                                value="{{ amenity.slug }}"
+                                {% if amenity in filters.amenities %}checked{% endif %}
+                        >
+                        {{ amenity.name }}
+                    </label>
+                    {% endfor %}
                 </div>
-                {% endfor %}
             </div>
 
             <div class="filter-drawer-group">
                 <h3 class="fs-sm fw-semibold mb-4">Payment</h3>
 
-                {% for payment in cafe_payments %}
-                <div class="form-field mb-3">
-                    <input
-                            type="checkbox"
-                            class="check"
-                            id="payment-{{ payment.slug }}"
-                            name="payments"
-                            value="{{ payment.slug }}"
-                            {% if payment in filters.payments %}checked{% endif %}
-                    >
-                    <label for="payment-{{ payment.slug }}">{{ payment.name }}</label>
+                <div class="option-row d-flex flex-wrap gap-3">
+                    {% for payment in cafe_payments %}
+                    <label class="btn-check btn-outline theme-primary" for="payment-{{ payment.slug }}">
+                        <input
+                                type="checkbox"
+                                class="check"
+                                id="payment-{{ payment.slug }}"
+                                name="payments"
+                                value="{{ payment.slug }}"
+                                {% if payment in filters.payments %}checked{% endif %}
+                        >
+                        {{ payment.name }}
+                    </label>
+                    {% endfor %}
                 </div>
-                {% endfor %}
             </div>
 
             <input type="hidden" name="sort_by" value="{{ sort_by }}">

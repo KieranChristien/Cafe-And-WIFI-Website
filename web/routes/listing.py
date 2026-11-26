@@ -15,7 +15,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from web.extensions import db, limiter
 from web.forms import CafeAddressForm, CafeEditForm, CafeReviewForm
-from web.models import Cafe, CafeOpeningHour, CafePhoto, CafeReview
+from web.models import Cafe, CafeAttribute, CafeOpeningHour, CafePhoto, CafeReview
 from web.services.cloudinary_storage import (
     validate_image_file,
     upload_image_file,
@@ -160,6 +160,52 @@ def _render_edit_page(
         map_center_latitude = selected_latitude
         map_center_longitude = selected_longitude
 
+    # Available attributes, grouped by category.
+    feature_attributes = sorted(
+        CafeAttribute.get_by_category("feature"),
+        key=lambda attribute: attribute.name.casefold(),
+    )
+    amenity_attributes = sorted(
+        CafeAttribute.get_by_category("amenity"),
+        key=lambda attribute: attribute.name.casefold(),
+    )
+    payment_attributes = sorted(
+        CafeAttribute.get_by_category("payment"),
+        key=lambda attribute: attribute.name.casefold(),
+    )
+
+    all_attributes = (
+            feature_attributes
+            + amenity_attributes
+            + payment_attributes
+    )
+
+    valid_attribute_slugs = {
+        attribute.slug
+        for attribute in all_attributes
+    }
+
+    # Preserve submitted selections when the form is re-rendered.
+    if request.method == "POST":
+        selected_attribute_slugs = list(dict.fromkeys(
+            slug
+            for slug in request.form.getlist("attribute_slugs")
+            if slug in valid_attribute_slugs
+        ))
+    else:
+        selected_attribute_slugs = [
+            attribute.slug
+            for attribute in cafe.attributes
+        ]
+
+    selected_attribute_slug_set = set(selected_attribute_slugs)
+
+    selected_attributes = [
+        attribute
+        for attribute in all_attributes
+        if attribute.slug in selected_attribute_slug_set
+    ]
+
     return render_template(
         "./listing/edit.html",
         cafe=cafe,
@@ -168,6 +214,12 @@ def _render_edit_page(
         website_title=cafe.name,
 
         overview_html=sanitize_overview(edit_form.overview.data),
+
+        feature_attributes=feature_attributes,
+        amenity_attributes=amenity_attributes,
+        payment_attributes=payment_attributes,
+        selected_attribute_slugs=selected_attribute_slugs,
+        selected_attributes=selected_attributes,
 
         selected_address_query=selected_address_query,
         selected_latitude=selected_latitude,
@@ -281,6 +333,47 @@ def edit(cafe_id: int):
     address_form = CafeAddressForm()
 
     if edit_form.validate_on_submit():
+
+        # --------------------------------------------------
+        # Validate selected café attributes
+        # --------------------------------------------------
+
+        attribute_slugs = list(dict.fromkeys(
+            slug
+            for slug in request.form.getlist("attribute_slugs")
+            if slug
+        ))
+
+        selected_attributes = (
+            db.session.scalars(
+                db.select(CafeAttribute).where(
+                    CafeAttribute.slug.in_(attribute_slugs)
+                )
+            ).all()
+            if attribute_slugs
+            else []
+        )
+
+        attributes_by_slug = {
+            attribute.slug: attribute
+            for attribute in selected_attributes
+        }
+
+        # Reject any submitted attribute that does not exist.
+        if len(attributes_by_slug) != len(attribute_slugs):
+            flash("Please choose valid café attributes.", "error")
+            return _render_edit_page(cafe, edit_form, address_form)
+
+        selected_attributes = [
+            attributes_by_slug[slug]
+            for slug in attribute_slugs
+        ]
+
+        attributes_changed = {
+                                 attribute.id for attribute in cafe.attributes
+                             } != {
+                                 attribute.id for attribute in selected_attributes
+                             }
 
         # --------------------------------------------------
         # Validate image selection
@@ -678,7 +771,15 @@ def edit(cafe_id: int):
         for key, value in changed.items():
             setattr(cafe, key, value)
 
-        if changed or opening_hours_changed or gallery_changed:
+        if attributes_changed:
+            cafe.attributes = selected_attributes
+
+        if (
+                changed
+                or attributes_changed
+                or opening_hours_changed
+                or gallery_changed
+        ):
 
             saved = commit_session(
                 success_message="Cafe updated successfully!",

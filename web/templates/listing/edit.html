@@ -117,13 +117,59 @@
                     </div>
                 </div>
 
-                <div class="d-flex flex-wrap gap-3 mb-7">
-                    {% for chip in cafe.attributes %}
-                    <span class="chip">
-                            {{ chip.name }}
+                <section class="cafe-attributes mb-7" aria-labelledby="cafeAttributesHeading">
+                    <h2 id="cafeAttributesHeading" class="visually-hidden">
+                        Café attributes
+                    </h2>
+
+                    <div
+                            class="cafe-attributes__list d-flex flex-wrap align-items-center gap-2"
+                            id="selectedAttributePreview"
+                            aria-live="polite"
+                    >
+                        {% for attribute in selected_attributes %}
+                        <span class="chip" data-attribute-chip>
+                            {{ attribute.name }}
                         </span>
-                    {% endfor %}
-                </div>
+                        {% else %}
+                        <span class="fs-sm fg-3" data-attribute-empty>
+                            No attributes selected
+                        </span>
+                        {% endfor %}
+
+                        <button
+                                type="button"
+                                class="btn-outline theme-secondary btn-sm cafe-attributes__edit"
+                                data-bs-toggle="drawer"
+                                data-bs-target="#attributeDrawer"
+                                aria-controls="attributeDrawer"
+                        >
+                            <svg
+                                    width="13"
+                                    height="13"
+                                    viewBox="0 0 16 16"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    stroke-width="1.6"
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    aria-hidden="true"
+                            >
+                                <path d="m10.5 2.5 3 3M2 14l3.2-.7L13.5 5a1.4 1.4 0 0 0-2-2L3.2 11.3 2 14Z"/>
+                            </svg>
+                            Edit
+                        </button>
+
+                        <span
+                                class="cafe-attributes__count fs-xs fg-3"
+                                id="selectedAttributeCount"
+                                aria-live="polite"
+                        >
+                            {{ selected_attributes|length }} selected
+                        </span>
+                    </div>
+
+                </section>
 
                 <ul class="nav nav-tabs mb-5" id="listingTab" role="tablist">
                     <li class="nav-item" role="presentation">
@@ -171,7 +217,7 @@
                         <div class="overview-editor edit-panel-width" style="max-width:44rem">
 
                             <label
-                                    class="visually-hidden"
+                                    class="form-label"
                                     id="overviewEditorLabel"
                                     for="overviewSource"
                             >
@@ -659,58 +705,238 @@
                 </div>
             </aside>
         </div>
-
-        <section class="mt-12">
-            <h2 class="fs-2xl fw-bold mb-6">Nearby</h2>
-            <div class="row g-5">
-                <div class="md:col-4">
-                    <article class="listing surface lift">
-                        <div class="listing-media">
-                            <div class="ph ph-16x9">Papier</div>
-                        </div>
-                        <div class="listing-body"><h3 class="listing-title"><a href="view.html">Papier Bookshop</a>
-                        </h3>
-                            <div class="listing-meta"><span class="rating"><svg viewBox="0 0 16 16"
-                                                                                fill="currentColor"
-                                                                                aria-hidden="true"><path
-                                    d="m8 1.5 1.9 4 4.35.6-3.15 3.05.76 4.35L8 11.45 4.14 13.5l.76-4.35L1.75 6.1 6.1 5.5z"/></svg>4.7</span><span
-                                    aria-hidden="true">&#183;</span><span>250 m</span></div>
-                        </div>
-                    </article>
-                </div>
-                <div class="md:col-4">
-                    <article class="listing surface lift">
-                        <div class="listing-media">
-                            <div class="ph ph-16x9">Wielen</div>
-                        </div>
-                        <div class="listing-body"><h3 class="listing-title"><a href="view.html">Wielen Bike
-                            Repair</a></h3>
-                            <div class="listing-meta"><span class="rating"><svg viewBox="0 0 16 16"
-                                                                                fill="currentColor"
-                                                                                aria-hidden="true"><path
-                                    d="m8 1.5 1.9 4 4.35.6-3.15 3.05.76 4.35L8 11.45 4.14 13.5l.76-4.35L1.75 6.1 6.1 5.5z"/></svg>4.9</span><span
-                                    aria-hidden="true">&#183;</span><span>600 m</span></div>
-                        </div>
-                    </article>
-                </div>
-                <div class="md:col-4">
-                    <article class="listing surface lift">
-                        <div class="listing-media">
-                            <div class="ph ph-16x9">De Vier Tafels</div>
-                        </div>
-                        <div class="listing-body"><h3 class="listing-title"><a href="view.html">De Vier Tafels</a>
-                        </h3>
-                            <div class="listing-meta"><span class="rating"><svg viewBox="0 0 16 16"
-                                                                                fill="currentColor"
-                                                                                aria-hidden="true"><path
-                                    d="m8 1.5 1.9 4 4.35.6-3.15 3.05.76 4.35L8 11.45 4.14 13.5l.76-4.35L1.75 6.1 6.1 5.5z"/></svg>4.6</span><span
-                                    aria-hidden="true">&#183;</span><span>800 m</span></div>
-                        </div>
-                    </article>
-                </div>
-            </div>
-        </section>
-
     </div>
 </main>
+
+<!-- Attribute editor drawer -->
+<dialog
+        class="drawer drawer-end"
+        tabindex="-1"
+        id="attributeDrawer"
+        aria-labelledby="attributeDrawerLabel"
+>
+
+    <!-- Fixed drawer header -->
+    <div class="drawer-header">
+
+        <div>
+            <h5 class="drawer-title" id="attributeDrawerLabel">
+                Café attributes
+            </h5>
+
+            <p class="fs-xs fg-3 mb-0">
+                Choose what this café offers.
+            </p>
+        </div>
+
+        <button
+                type="button"
+                class="btn-close"
+                data-bs-dismiss="drawer"
+                aria-label="Close"
+        ></button>
+
+    </div>
+
+    <!-- Scrollable drawer content -->
+    <div class="drawer-body attribute-drawer-body">
+
+        <div class="d-flex justify-content-between align-items-center mb-4">
+
+            <p class="fs-sm fg-2 mb-0">
+                Select all that apply.
+            </p>
+
+            <button
+                    type="button"
+                    class="btn fs-sm"
+                    data-clear-attributes
+            >
+                Clear all
+            </button>
+
+        </div>
+
+        <!-- Search -->
+        <div class="form-field mb-5">
+
+            <label class="form-label" for="attributeSearch">
+                Search attributes
+            </label>
+
+            <input
+                    type="search"
+                    class="form-control"
+                    id="attributeSearch"
+                    placeholder="Search..."
+                    autocomplete="off"
+            >
+
+        </div>
+
+        {% set attribute_groups = [
+        ("Features", feature_attributes),
+        ("Amenities", amenity_attributes),
+        ("Payment methods", payment_attributes)
+        ] %}
+
+        <!-- Attribute groups -->
+        {% for group_title, attributes in attribute_groups %}
+
+        <fieldset
+                class="filter-drawer-group border-0 p-0 mb-5"
+                data-attribute-group
+        >
+
+            <legend class="fs-sm fw-semibold mb-3">
+                {{ group_title }}
+            </legend>
+
+            <div class="option-row d-flex flex-wrap gap-3">
+
+                {% for attribute in attributes %}
+
+                <label
+                        class="btn-check btn-outline theme-primary"
+                        data-attribute-option
+                        data-attribute-name="{{ attribute.name }}"
+                >
+
+                    <input
+                            type="checkbox"
+                            name="attribute_slugs"
+                            value="{{ attribute.slug }}"
+                            form="editForm"
+                            {% if attribute.slug in selected_attribute_slugs %}
+                            checked
+                            {% endif %}
+                    >
+
+                    {{ attribute.name }}
+
+                </label>
+
+                {% endfor %}
+
+            </div>
+
+        </fieldset>
+
+        {% endfor %}
+
+        <div class="mt-6">
+
+            <button
+                    type="button"
+                    class="btn-solid theme-primary w-100"
+                    data-bs-dismiss="drawer"
+            >
+                Done
+            </button>
+
+        </div>
+
+    </div>
+
+</dialog>
+
+<script>
+    (() => {
+        const editor = document.querySelector("#attributeDrawer");
+
+        if (!editor) return;
+
+        const checkboxes = Array.from(
+            editor.querySelectorAll('input[name="attribute_slugs"]')
+        );
+
+        const preview = document.querySelector("#selectedAttributePreview");
+        const editButton = preview?.querySelector(".cafe-attributes__edit");
+        const count = document.querySelector("#selectedAttributeCount");
+        const search = document.querySelector("#attributeSearch");
+
+        const clearButton = editor.querySelector("[data-clear-attributes]");
+
+        if (!preview || !editButton || !count || !search || !clearButton) return;
+
+        function updateAttributePreview() {
+            const selected = checkboxes.filter(
+                checkbox => checkbox.checked
+            );
+
+            // Remove only the generated attribute chips/empty message. Keep the
+            // Edit button and count in the same flex container so they flow
+            // immediately after the final chip.
+            preview.querySelectorAll(
+                "[data-attribute-chip], [data-attribute-empty]"
+            ).forEach(element => element.remove());
+
+            if (selected.length === 0) {
+                const emptyMessage = document.createElement("span");
+
+                emptyMessage.className = "fs-sm fg-3";
+                emptyMessage.dataset.attributeEmpty = "";
+                emptyMessage.textContent = "No attributes selected";
+
+                preview.insertBefore(emptyMessage, editButton);
+            } else {
+                selected.forEach(checkbox => {
+                    const option = checkbox.closest(
+                        "[data-attribute-option]"
+                    );
+
+                    const chip = document.createElement("span");
+
+                    chip.className = "chip";
+                    chip.dataset.attributeChip = "";
+                    chip.textContent =
+                        option?.dataset.attributeName || checkbox.value;
+
+                    preview.insertBefore(chip, editButton);
+                });
+            }
+
+            count.textContent = `${selected.length} selected`;
+        }
+
+        function filterAttributeOptions() {
+            const query = search.value.trim().toLocaleLowerCase();
+
+            editor.querySelectorAll("[data-attribute-group]").forEach(group => {
+                const options = Array.from(
+                    group.querySelectorAll("[data-attribute-option]")
+                );
+
+                let visibleCount = 0;
+
+                options.forEach(option => {
+                    const matches = option.dataset.attributeName
+                        .toLocaleLowerCase()
+                        .includes(query);
+
+                    option.hidden = !matches;
+
+                    if (matches) visibleCount++;
+                });
+
+                group.hidden = visibleCount === 0;
+            });
+        }
+
+        checkboxes.forEach(checkbox => {
+            checkbox.addEventListener("change", updateAttributePreview);
+        });
+
+        search.addEventListener("input", filterAttributeOptions);
+
+        clearButton.addEventListener("click", () => {
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = false;
+            });
+
+            updateAttributePreview();
+        });
+
+    })();
+</script>
 {% endblock %}

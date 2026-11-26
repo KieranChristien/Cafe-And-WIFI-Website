@@ -1537,9 +1537,8 @@
 
     cursor: pointer;
 
-    transition:
-        background 0.15s ease,
-        border-color 0.15s ease;
+    transition: background 0.15s ease,
+    border-color 0.15s ease;
 }
 
 .listing-photo-lightbox__close:hover,
@@ -1645,4 +1644,41 @@ body:has(#listingPhotoLightbox[open]) {
     .listing-photo-lightbox__nav {
         transition: none;
     }
+}
+
+/* --------------------------------------------------
+   Café attribute editor drawer
+   -------------------------------------------------- */
+
+#attributeDrawer .drawer-header {
+    flex-shrink: 0;
+}
+
+#attributeDrawer .attribute-drawer-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+/* --------------------------------------------------
+   Café attributes preview
+   -------------------------------------------------- */
+
+.cafe-attributes__list {
+    row-gap: 0.625rem !important;
+}
+
+.cafe-attributes__edit {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.cafe-attributes__count {
+    white-space: nowrap;
+    margin-inline-start: 0.25rem;
 }
