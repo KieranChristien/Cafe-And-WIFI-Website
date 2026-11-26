@@ -4,7 +4,7 @@ from datetime import datetime
 from flask import Blueprint, jsonify, render_template, request, url_for, abort
 from typing import Literal, cast
 
-from web.extensions import db
+from web.extensions import db, limiter
 from web.models import (Cafe, CafeAttribute, filter_by_attribute, get_attributes_from_slugs,
                         get_review_stats, join_review_stats, filter_open_now, filter_open_on_date)
 
@@ -324,6 +324,7 @@ def home():
 
 
 @main.route('/cafes/count')
+@limiter.limit("120 per minute; 1000 per hour")
 def cafe_count():
     stmt = _get_filtered_cafes(_get_filters())
 
