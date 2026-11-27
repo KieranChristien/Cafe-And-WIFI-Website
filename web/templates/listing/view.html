@@ -36,8 +36,37 @@
                 <div class="d-flex flex-wrap align-items-start gap-4 mb-5">
                     <div class="me-auto">
                         <div class="d-flex flex-wrap align-items-center gap-3 mb-3">
-                            <span class="badge theme-primary">Editor&#8217;s pick</span>
-                            <span class="badge badge-subtle theme-success">Claimed</span>
+                            <span class="badge theme-primary">
+                                Editor's pick
+                            </span>
+
+                            <span class="badge badge-subtle theme-success">
+                                Claimed
+                            </span>
+
+                            {% set closed_messages = {
+                            "event": "Hosting an event",
+                            "private_function": "Hosting a private function",
+                            "maintenance": "Undergoing maintenance",
+                            "renovations": "Undergoing renovations",
+                            "staffing_issues": "Experiencing staffing issues",
+                            "stock_issues": "Experiencing stock issues",
+                            "power_outage": "Experiencing a power outage",
+                            "water_outage": "Experiencing a water outage",
+                            "technical_issues": "Experiencing technical difficulties",
+                            "health_safety": "Closed for health and safety reasons",
+                            "security": "Closed due to security concerns",
+                            "weather": "Closed due to weather conditions",
+                            "inspection": "Undergoing an inspection",
+                            "emergency": "Dealing with an emergency",
+                            "permanent": "Permanently closed",
+                            "other": "Temporarily closed"
+                            } %}
+                            {% if cafe.is_manually_closed and cafe.manual_closed_message in closed_messages %}
+                            <span class="badge badge-subtle {% if cafe.manual_closed_message == 'permanent' %} theme-danger {% else %} theme-warning {% endif %}">
+                                {{ closed_messages[cafe.manual_closed_message] }}
+                            </span>
+                            {% endif %}
                         </div>
                         <h1 class="fs-4xl fw-bold mb-3" style="letter-spacing:-.03em">{{ cafe.name }}</h1>
                         <div class="listing-meta">
