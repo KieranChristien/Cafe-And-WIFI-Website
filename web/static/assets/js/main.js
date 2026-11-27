@@ -1960,14 +1960,6 @@ const initManualClosure = () => {
         messageSelect.disabled = !manuallyClosed
         messageSelect.required = manuallyClosed
 
-        if (!manuallyClosed) {
-            messageSelect.value = ''
-
-            messageSelect.removeAttribute('data-touched')
-            messageSelect.removeAttribute('aria-invalid')
-            messageSelect.classList.remove('is-invalid', 'is-valid')
-        }
-
         // Regular opening hours
         fieldset.disabled = manuallyClosed
         fieldset.hidden = manuallyClosed
