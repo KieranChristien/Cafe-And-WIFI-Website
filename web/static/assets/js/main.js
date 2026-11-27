@@ -1945,14 +1945,30 @@ const initNearestSort = () => {
 const initManualClosure = () => {
 
     const checkbox = document.getElementById('isManuallyClosed')
+    const messageContainer = document.getElementById('manualClosedMessageField')
+    const messageSelect = document.getElementById('cClosedMessage')
     const fieldset = document.getElementById('openingHoursFieldset')
 
-    if (!checkbox || !fieldset) return
+    if (!checkbox || !messageContainer || !messageSelect || !fieldset) return
 
     const sync = () => {
 
         const manuallyClosed = checkbox.checked
 
+        // Closure reason
+        messageContainer.hidden = !manuallyClosed
+        messageSelect.disabled = !manuallyClosed
+        messageSelect.required = manuallyClosed
+
+        if (!manuallyClosed) {
+            messageSelect.value = ''
+
+            messageSelect.removeAttribute('data-touched')
+            messageSelect.removeAttribute('aria-invalid')
+            messageSelect.classList.remove('is-invalid', 'is-valid')
+        }
+
+        // Regular opening hours
         fieldset.disabled = manuallyClosed
         fieldset.hidden = manuallyClosed
 

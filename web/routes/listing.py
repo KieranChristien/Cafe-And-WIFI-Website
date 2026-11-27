@@ -656,6 +656,7 @@ def edit(cafe_id: int):
 
             "timezone": (edit_form.timezone.data or "").strip() or None,
             "is_manually_closed": edit_form.is_manually_closed.data,
+            "manual_closed_message": edit_form.manual_closed_message.data if edit_form.is_manually_closed.data else None,
 
             # Geocoding metadata
             "location_provider": address["provider"],

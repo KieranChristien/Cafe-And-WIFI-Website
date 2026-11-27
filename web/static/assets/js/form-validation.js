@@ -1,4 +1,3 @@
-
 /* ===================================================================
  * Form Validation
  *
@@ -84,7 +83,7 @@ const addDescribedBy = (field, feedback) => {
  * ------------------------------------------------------------------- */
 
 const isRequiredEmpty = (field) => {
-    if (!field.required && field.dataset.msgRequired === undefined) {
+    if (!field.disabled || !field.required) {
         return false
     }
 
@@ -418,7 +417,7 @@ const initialiseForm = (form) => {
 
         let firstInvalidField = null
 
-        fields.forEach((field) => {
+        getFields(form).forEach((field) => {
             if (!validateField(field) && !firstInvalidField) {
                 firstInvalidField = field
             }

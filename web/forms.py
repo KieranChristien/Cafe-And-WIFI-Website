@@ -648,22 +648,18 @@ def url_render_kw(
 # ------------------------------------------------------------------------------------------------------
 # CAFE FORM HELPERS
 # ------------------------------------------------------------------------------------------------------
+MANUAL_CLOSED_MESSAGE_REQUIRED = "Please select a closure reason."
 
-COUNTRY_CHOICES = [
-    ("", "Select a country"),
-    *[
-        (country.alpha_2, country.name)
-        for country in sorted(
-            pycountry.countries,
-            key=lambda country: country.name.casefold(),
-        )
-    ],
-]
+
+def validate_manual_closed_message(form, field) -> None:
+    if form.is_manually_closed.data and not field.data:
+        raise ValidationError(MANUAL_CLOSED_MESSAGE_REQUIRED)
 
 
 # ------------------------------------------------------------------------------------------------------
 # OPENING HOURS
 # ------------------------------------------------------------------------------------------------------
+
 def validate_opening_time(form, field) -> None:
     if form.is_closed.data:
         return
@@ -777,7 +773,36 @@ class CafeForm(FlaskForm):
     )
 
     is_manually_closed = BooleanField(
-        "Temporarily closed"
+        "Manually Closed"
+    )
+
+    manual_closed_message = SelectField(
+        "Reason",
+        choices=[
+            ("", "Select a reason"),
+            ("event", "Event"),
+            ("private_function", "Private Function"),
+            ("maintenance", "Maintenance"),
+            ("renovations", "Renovations"),
+            ("staffing_issues", "Staffing Issues"),
+            ("stock_issues", "Stock Issues"),
+            ("power_outage", "Power Outage"),
+            ("water_outage", "Water Outage"),
+            ("technical_issues", "Technical Issues"),
+            ("health_safety", "Health & Safety"),
+            ("security", "Security"),
+            ("weather", "Weather"),
+            ("inspection", "Inspection"),
+            ("emergency", "Emergency"),
+            ("permanent", "Permanently Closed"),
+            ("other", "Other"),
+        ],
+        default="",
+        validators=[validate_manual_closed_message],
+        render_kw={
+            "data-msg-required": MANUAL_CLOSED_MESSAGE_REQUIRED,
+        },
+        validate_choice=True,
     )
 
     opening_hours = FieldList(

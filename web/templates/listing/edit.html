@@ -575,6 +575,14 @@
                             </p>
                         </div>
 
+                        <div class="form-field mb-4" id="manualClosedMessageField">
+                            {{ edit_form.manual_closed_message.label(class="form-label", for="cClosedMessage") }}
+
+                            {{ edit_form.manual_closed_message(class="fg-2 fs-sm mb-1 form-control", id="cClosedMessage") }}
+
+                            {{ invalid_feedback(edit_form.manual_closed_message, "cClosedMessage") }}
+                        </div>
+
                         {% set weekdays = [
                         "Monday",
                         "Tuesday",
@@ -593,7 +601,7 @@
                                 hidden
                                 {% endif %}
                         >
-                            <h2 class="fs-sm fw-semibold mb-3">Opening hours</h2>
+                            <label class="form-label" for="openingHours">Opening hours</label>
                             <div class="mb-5" id="openingHours">
                                 {% for entry in edit_form.opening_hours %}
 

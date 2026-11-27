@@ -241,10 +241,35 @@
                                     <span class="chip">{{ attribute.name }}</span>
                                     {% endfor %}
                                 </div>
+
+                                {% set operating_status = cafe.operating_status %}
+                                {% if not cafe.is_manually_closed %}
+                                {% set next_closing_time = cafe.next_closing_time %}
+                                {% set next_opening_time = cafe.next_opening_time %}
+                                {% endif %}
+
+                                {% set closed_messages = {
+                                "event": "Hosting an event",
+                                "private_function": "Hosting a private function",
+                                "maintenance": "Undergoing maintenance",
+                                "renovations": "Undergoing renovations",
+                                "staffing_issues": "Experiencing staffing issues",
+                                "stock_issues": "Experiencing stock issues",
+                                "power_outage": "Experiencing a power outage",
+                                "water_outage": "Experiencing a water outage",
+                                "technical_issues": "Experiencing technical difficulties",
+                                "health_safety": "Closed for health and safety reasons",
+                                "security": "Closed due to security concerns",
+                                "weather": "Closed due to weather conditions",
+                                "inspection": "Undergoing an inspection",
+                                "emergency": "Dealing with an emergency",
+                                "permanent": "Permanently closed",
+                                "other": "Temporarily closed"
+                                } %}
                                 <p class="listing-meta mb-0 mt-auto">
-                                    {% if cafe.operating_status == "open" %}
+                                    {% if operating_status == "open" %}
                                     <span class="open-now">Open</span>
-                                    {% elif cafe.operating_status == "closed" %}
+                                    {% elif operating_status == "closed" %}
                                     <span class="closed-now">Closed</span>
                                     {% else %}
                                     <span class="text-muted">Unknown</span>
@@ -252,13 +277,17 @@
                                     <span aria-hidden="true">
                                         ·
                                     </span>
-                                    {% if cafe.operating_status == "open" %}
+                                    {% if cafe.is_manually_closed and cafe.manual_closed_message in closed_messages %}
                                     <span>
-                                        Closes {{ cafe.next_closing_time.strftime("%H:%M") }}
+                                        {{ closed_messages[cafe.manual_closed_message] }}
                                     </span>
-                                    {% elif cafe.next_opening_time %}
+                                    {% elif operating_status == "open" and next_closing_time %}
                                     <span>
-                                        Opens {{ cafe.next_opening_time.strftime("%H:%M") }}
+                                        Closes {{ next_closing_time.strftime("%H:%M") }}
+                                    </span>
+                                    {% elif operating_status == "closed" and next_opening_time %}
+                                    <span>
+                                        Opens {{ next_opening_time.strftime("%H:%M") }}
                                     </span>
                                     {% else %}
                                     <span>
